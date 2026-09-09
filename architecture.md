@@ -17,17 +17,17 @@ Style: data-oriented C/C++ on ESP-IDF. POD tables, integer IDs, no STL in the ho
 | Display | 1.54" IPS **240×240**, ST7789, **4-wire SPI**, RGB565, GRAM on-panel, **no TE pin** |
 | IMU | QMI8658 (accel + gyro, **no magnetometer**) |
 | Touch | CST816 (I2C, one finger) |
-| Audio | ES8311 + ES7210 + NS4150B present. **Powered down in v1.** |
-| Storage | TF slot present. **Unused in the frame loop.** |
+| Audio | **v1.** ES8311 + NS4150B. Procedural **2-voice** mixer on Core 0. ES7210 **off** (mic later). Speaker on MX1.25 **TBD at bring-up**. |
+| Storage | TF slot present. **Unused in the frame loop.** Audio is not on the card. |
 | Display rate | **30 FPS** cap. Physics in the same 33 ms loop. |
-| Battery | ~1000 mAh. Target **~8 h** awake, dim. Wi-Fi is a luxury mode. |
+| Battery | ~1000 mAh. **Strive for ~8 h** awake, dim — not a hard cap. Wi-Fi is a luxury mode. |
 | Look | Low-poly, hard edges, Spore Creatures (NDS) silhouette. The **room and pivots** orbit smoothly. The **pet pixels** facet every ~37° (20 sheets). |
 | Camera | Boom, look-at = **pet core**. **Continuous** IMU. Never quantized to the dodecahedron. Elevation clamped ≥ ~12° (no peek-under). |
 | Pet draw | **Part sheets** baked from 20 dodecahedron cameras. Runtime picks the nearest sheet. Not a runtime triangle pet. |
 | Pixels | **Indexed-8** atlas and framebuffer. Palette 32, color 0 = key. Expand to RGB565 only on SPI scanout. |
 | Room draw | **6 quads** (floor, 4 walls, optional ceiling). Raster from the **live** view/proj. |
 | Motion | Clips write **rest**. Springs write **pos**. Hitboxes follow **pos**. |
-| Brain | Offline-first. **Lizard-brain behaviour, clip list, and animation triggers are TBD.** The machinery (rest tables, clips, `clip_id` inbox) exists; what *starts* a wave is not locked. |
+| Brain | Offline-first. **Lizard-brain behaviour, clip list, and animation triggers are TBD.** The machinery (rest tables, clips, `clip_id` inbox, `ClipHdr.vox_id`) exists; what *starts* a wave is not locked. |
 | Parts kit | **Not v1.** Slot IDs exist now so a kit is more atlas + `part_ids[6]`, not a new renderer. |
 
 **Golden rules**
@@ -35,10 +35,11 @@ Style: data-oriented C/C++ on ESP-IDF. POD tables, integer IDs, no STL in the ho
 1. Core 1 never waits on Core 0, Wi-Fi, or the LLM.
 2. The pet is complete with the radio off.
 3. World down is real gravity. The screen is a camera, not a world axis.
-4. Sleeping the CPU is a feature. Spinning at 240 MHz with a static frame is a bug.
+4. Sleeping the CPU is a feature. Spinning at 240 MHz with a static frame is a bug. **Silence with I2S clocks or the PA up is the same bug.**
 5. Sheets are appearance. Springs are state. Pixels are not physics.
 6. Animation and the matching sheet frame are the **same pose**. Springs only lag that pose.
 7. The camera is continuous. Only `view_idx` (which photo) is discrete.
+8. Core 1 never plays audio. It may **emit** an `SfxEvt`. Core 0 mixes.
 
 ---
 
@@ -113,7 +114,7 @@ Boom length: FOV ~55°, pet ~1/3 of the frame, camera kept outside the cube. Sam
 
 ## 2. Hardware map
 
-Confirm once against the [schematic](https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.54/ESP32-S3-LCD-1.54-Schematic.pdf), then treat as law.
+Confirm once against [refs/ESP32-S3-LCD-1.54-Schematic.pdf](refs/ESP32-S3-LCD-1.54-Schematic.pdf), then treat as law.
 
 | Function | GPIO | Notes |
 | :--- | :--- | :--- |
@@ -122,8 +123,8 @@ Confirm once against the [schematic](https://files.waveshare.com/wiki/ESP32-S3-T
 | I2C SCL / SDA | 41 / 42 | **One bus:** QMI8658, CST816, ES8311, ES7210 |
 | Touch INT / RST | 48 / 47 | IRQ-driven |
 | IMU INT | 6 | FIFO watermark |
-| PA enable | 7 | Keep low |
-| I2S | 8 / 9 / 10 / 11–12 | Unused v1 |
+| PA enable | 7 | NS4150B. **High only while a voice is live** |
+| I2S | 8 MCLK / 9 BCLK / 10 WS / 11 DIN / 12 DOUT | TX to ES8311. DIN unused v1 (mic later) |
 | BAT_EN | 2 | **Hold high** or the board dies on battery |
 | VBAT ADC / charging | 1 / 3 | Housekeeping |
 | PWR / PLUS / BOOT | 5 / 4 / 0 | PWR long-press = latch off. PLUS = recenter |
@@ -141,9 +142,9 @@ Wi-Fi DMA cannot live in PSRAM. Dual RGB565 frames (2×115 KB) plus radio is a b
 
 | Region | Use |
 | :--- | :--- |
-| **Internal DRAM** | Two **8-bit indexed** framebuffers (2×57.6 KB), **32-entry** RGB565 palette (256-slot table still fine), RGB565 scanline bounce for SPI, `Bodies` SoA (~1 KB), seqlock snapshot, clip playback scratch, 5 cached `SpriteRec`, RTOS stacks. Blit inner loop **never** touches PSRAM. Atlas is indexed-8, same palette. |
-| **Octal PSRAM** | Atlas pixels if XIP cache thrash shows up. Not the framebuffer. |
-| **16 MB flash** | Firmware, clip tracks, `sprite_id` table, `SpriteRec`s, atlas, 20 vertices. XIP for cold tables. |
+| **Internal DRAM** | Two **8-bit indexed** framebuffers (2×57.6 KB), **32-entry** RGB565 palette (256-slot table still fine), RGB565 scanline bounce for SPI, `Bodies` SoA (~1 KB), seqlock snapshot, `SfxEvt` ring, two synth voices, 256-sample I2S mix bounce, clip playback scratch, 5 cached `SpriteRec`, RTOS stacks. Blit inner loop **never** touches PSRAM. Atlas is indexed-8, same palette. Mixer **never** touches PSRAM. |
+| **Octal PSRAM** | Atlas pixels if XIP cache thrash shows up. Not the framebuffer. Not audio. |
+| **16 MB flash** | Firmware, clip tracks, `sprite_id` table, `SpriteRec`s, atlas, 20 vertices, `SynthPatch[]`. XIP for cold tables. **No PCM in v1.** |
 | **RTC SRAM** | Hunger, happy, sleep, last emotion, later `part_ids[6]`. |
 
 **Scanout:** indexed back buffer → expand dirty rows to RGB565 bounce → GDMA to ST7789.
@@ -159,13 +160,14 @@ Fallback: one RGB565 (115 KB), serialize blit then DMA.
 | Clip tracks | flash | KB |
 | `sprite_id` + recs | flash | tens of KB |
 | Atlas pixels | flash / PSRAM | **the** budget (MB) |
+| `SynthPatch[]` | flash → DRAM copy | ~16 B × N (tiny) |
 | 20 vertices | DRAM | 120 B |
 
 ---
 
 ## 4. Core allocation
 
-### Core 0 — lizard brain, sensors, optional radio
+### Core 0 — lizard brain, sensors, mixer, optional radio
 
 | Prio | Job | Rate |
 | :--- | :--- | :--- |
@@ -173,9 +175,10 @@ Fallback: one RGB565 (115 KB), serialize blit then DMA.
 | 12 | QMI8658 FIFO + complementary filter | 100 Hz |
 | 11 | CST816 IRQ → poke UV, double-tap recenter | event |
 | 8 | Needs, wander, gaze, flinch, clip requests, cortex inject | 20 Hz |
+| 7 | Mixer: fill I2S, PA gate, codec I2C start/stop | 12 kHz / 256-sample block |
 | 5 | Backlight, VBAT, BAT_EN, PWR, Wi-Fi up/down | 1–10 Hz |
 
-**One I2C owner** on 41/42.
+**One I2C owner** on 41/42. ES8311 register writes only on play start/stop/volume — never inside the 100 Hz IMU drain. ES7210 not initialized.
 
 ### Core 1 — the body (one pinned task)
 
@@ -186,7 +189,7 @@ forever:
     sample_clip_or_emotion → rest[]     // body space
     rest_head += gaze_offset            // additive, optional
     step_springs(dt)                    // gravity -Y on core only
-    collide()                           // see §8
+    collide()                           // see §8; may push SfxEvt (never block)
     build_live_camera()                 // IMU boom; not a vertex
     view_idx = nearest_dodeca(dir_local) // sheets only
     if dirty:                           // springs, clip, view_idx, or |Δcam| > eps
@@ -236,6 +239,26 @@ _Atomic uint32_t     g_shared_idx;
 Core 1 copies one coherent snapshot per tick and never reads `g_shared` again that frame.
 
 UDP packets are packed little-endian, **not** this struct.
+
+### Core 1 → Core 0: sound events
+
+`SharedSnap` does not go this way. Collisions live on Core 1. A tiny overwrite-oldest SPSC; Core 1 **never waits**.
+
+```c
+enum { SFX_Q = 8 };
+
+typedef struct {
+    uint8_t id;      // patch_id; 0 = none
+    uint8_t vel;     // Q8 closing speed → gain / f0
+    uint8_t tag;     // pair / part; optional
+} SfxEvt;
+
+DRAM_ATTR SfxEvt     g_sfx[SFX_Q];
+_Atomic uint8_t      g_sfx_w;
+_Atomic uint8_t      g_sfx_r;
+```
+
+Full → drop oldest. Core 0 also **pokes the mixer directly** (clip start, flinch). Same consumer, two producers. See §9.
 
 ---
 
@@ -293,6 +316,7 @@ typedef struct {
     uint8_t  frame_count;   // 6–10
     uint8_t  fps;           // 15 is enough
     uint16_t duration_ms;
+    uint8_t  vox_id;        // 0 = silent; patch id, play on clip **start**
 } ClipHdr;
 
 // Packed after header, only masked parts:
@@ -309,6 +333,8 @@ Playback: `u = t * fps`, lerp two keys, Q8 → float, write `rest[p]`. Missing m
 **Stiffness:** while a clip is active, raise `k` on masked parts so the hand actually rises. Blend `k` down on clip end. If `k` is too low, you show a raised-arm sheet on a dangling mass.
 
 **Gaze:** `rest_head += gaze_offset` after the clip sample. Additive. Do not replace the clip.
+
+**Vox:** if `vox_id != 0`, Core 0 starts that patch on voice B when the clip **starts** (including cortex-injected `clip_id`). Lizard does not fire a second trigger. Emotion rest tables never auto-vox. `vox_id == 0` is silent, same as `clip_id == 0`.
 
 **No walk-cycle film in v1.** Locomotion is core translation + yaw. Legs get a tiny idle bob in the emotion table or a 2-frame clip, not 8 walk × 20 views.
 
@@ -341,13 +367,66 @@ Author clips **inside** the cube. Collision is not an animation editor.
 
 **Poke:** unproject the tap through `inv(proj*view)`, ray vs spheres, closest hit. Floor ray if miss → walk / look there.
 
-**Squish:** core penetration → uniform scale on core blit (~100 ms recover).
+**Squish:** core penetration → uniform scale on core blit (~100 ms recover). Push a squish patch (voice A) if closing speed beats the threshold.
 
-**Flinch:** `jerk` impulse on core + head `vel`. Springs recover into current `rest` (idle or clip).
+**Flinch:** `jerk` impulse on core + head `vel`. Springs recover into current `rest` (idle or clip). Core 0 pokes a yelp on voice B (not a clip).
+
+**Audio from collide:** on impulse, not contact. Closing speed along the normal above a threshold, plus ~150–250 ms cooldown **per pair**, or a rolling core machine-guns the floor. Push `SfxEvt` and return. Pairs that are on (core vs floor/wall/toys, limb vs toys, poke) are first-class; limb vs wall stays off and stays silent. See §9.
 
 ---
 
-## 9. Rendering
+## 9. Audio (procedural, two voices)
+
+**Locked:** v1, on battery. Mixer on Core 0. Two voices. Procedural patches, **no PCM**. ES7210 off. PA gated. Let a live voice **finish** before chip sleep. 8 h is a strive-for, not a gate that kills chirps.
+
+```
+Core 1 collide / squish  →  SfxEvt { id, vel, tag }   // voice A
+Core 0 clip start (vox_id), jerk  →  mixer poke        // voice B
+
+Core 0 @ 12 kHz mono, block 256:
+    voice A: impact  (noise + one bandpass, decay from vel)
+    voice B: creature (2-op FM or square+noise, patch envelopes)
+    int32 mix → saturate int16 → I2S GDMA → ES8311
+PA GPIO 7 high only while a voice is live
+```
+
+**12 kHz, not 24.** This speaker and this look do not need XiaoZhi’s 24 kHz duplex. Confirm with a sine at bring-up; drop to 8 kHz only if the amp/coil is ugly. Steal **pins**, not that audio graph. No MP3, no TF, no AEC.
+
+**Two voices:** a wave that bops a toy **layers** grunt + bop. A third event of the same class replaces that voice; it does not stack. Last-event-wins inside a class.
+
+**Procedural, not samples.** Patches are PODs. The hot path never reads flash for audio. Atlas XIP stays the scarce resource.
+
+```c
+typedef struct {
+    uint8_t  id;
+    uint8_t  kind;       // 0 impact, 1 vox
+    uint8_t  osc;        // noise / square / fm
+    uint8_t  flags;
+    uint16_t dur_ms;
+    uint16_t f0, f1;     // start/end Hz
+    uint8_t  q;          // resonance
+    uint8_t  noise;      // mix
+    uint8_t  atk, dec;   // Q8 time
+    uint8_t  fm_idx;     // 2-op only
+    uint8_t  vel_amt;    // SfxEvt.vel bends f0 / gain
+} SynthPatch;            // 16 bytes
+```
+
+Voice A: three impact patches (floor, wall, ball) — different `f0`/`q`, not three code paths. Voice B: effort / yelp / happy / sleepy. Tuning is data. Idle ambient loops are **off** (they fight PA-gating and sleep).
+
+Collision map: `(pair → patch_id)` in a tiny table. Not art.
+
+**Sleep / GRAM-hold:** Core 1 may skip SPI and WFI while a tail plays. Do **not** light-sleep or deep-sleep the chip, and do not drop PA, until both voices decay to zero (or a hard cap ~800 ms). Face-down: **do not start** new events; let the current tail end; PA low; then sleep.
+
+**Codec:** lazy-init ES8311 on first sound; **standby** between phrases (re-init is tens of ms — a wall hit would miss). Full off only on deep sleep. Volume **fixed** in v1 (studio may be louder, like backlight). PLUS stays recenter.
+
+**Speaker:** MX1.25 header. Confirm when the board arrives. Bring-up is I2C ACK + PA pulse + sine; open header is not a missing driver.
+
+**Mic / ES7210:** later. Not initialized. DIN pin unused.
+
+---
+
+## 10. Rendering
 
 ### Room
 
@@ -387,13 +466,13 @@ Toys: one colored sphere raster or one sheet.
 | Room quads | < 1 ms |
 | 5 sprite blits | 0.5–2 ms |
 | SPI DMA | ~7–12 ms |
-| Slack → light-sleep | the rest |
+| Slack → WFI | the rest; chip light-sleep only if mixer idle |
 
 No runtime scale. Boom length is constant; one sprite size is enough.
 
 ---
 
-## 10. Asset pipeline (PC)
+## 11. Asset pipeline (PC)
 
 Blender: low poly, hard edges, 16–32 colors, 6-bone armature. Origin of each part mesh at the attach.
 
@@ -419,13 +498,32 @@ Dodecahedron: vertex 0 = +Y. Store the 20 unit vectors in the blob; runtime and 
 | + wave 8 frames on **all** parts | ~3+ MB extra | Wasteful |
 | + wave 8 frames on **core + arm_r only** | ~0.6 MB extra | Yes |
 
-**Clip list and what plays when: TBD** (lizard brain). The pak format allows sparse clips; first art can be a single idle pose × 20 views. Extra emotions/wave are data, not engine work. Legs may reuse idle sheets (`0xFFFF` fallback).
+**Clip list and what plays when: TBD** (lizard brain). The pak format allows sparse clips; first art can be a single idle pose × 20 views. Extra emotions/wave are data, not engine work. Legs may reuse idle sheets (`0xFFFF` fallback). Clips that should grunt set `vox_id`; idle/emotion tables do not.
 
-Exporter emits one `.pak`: vertices, clips, `sprite_id`, recs, atlas, palette.
+Exporter emits one `.pak`: vertices, clips (`ClipHdr` includes `vox_id`), `sprite_id`, recs, atlas, palette, then audio:
+
+```
+patch_count, SynthPatch[patch_count]   // ~16 × N; copy to DRAM at boot
+pcm_count = 0                          // reserved; v1 is procedural
+pcm_index[]                            // empty
+```
+
+Custom packer. Runtime never sees a wav. If patches fail later:
+
+```c
+typedef struct {
+    uint32_t off;
+    uint16_t n_samples;
+    uint8_t  rate_div;   // 1 = 12 kHz, 2 = 6 kHz
+    uint8_t  fmt;        // 0 = s8, 1 = ima4
+} PcmRec;
+```
+
+Stream 256 frames into the existing voice. Do not decode MP3. Do not use the TF slot.
 
 ---
 
-## 11. Lizard brain — **behaviour TBD**
+## 12. Lizard brain — **behaviour TBD**
 
 The toy must run with the radio off. **What it does** (when it wanders, waves, sleeps, thinks) is not locked yet. Do not invent a personality in the engine.
 
@@ -434,14 +532,16 @@ The toy must run with the radio off. **What it does** (when it wanders, waves, s
 - `emotion_rest[]` and clip tracks can drive `rest[]`
 - Core 0 may set `clip_id` / `emotion` in the snapshot; Core 1 only samples and blends
 - Hunger/happy **storage** in RTC exists; decay rates TBD
-- Flinch is a physics impulse on `jerk` — keep that hook even if the *when* is TBD
+- Flinch is a physics impulse on `jerk` — keep that hook even if the *when* is TBD. Core 0 also pokes voice B (yelp)
 - Gaze offset on `rest_head` is an optional hook, not a requirement
+- `ClipHdr.vox_id` plays on clip start; lizard does not own a parallel vox trigger. `vox_id == 0` is silent
+- `collide()` may push `SfxEvt`; threshold/cooldown are engine, not personality
 
-No locked mapping of poke → wave, PLUS → anything except recenter, or cortex `action` → clip. Cortex `clip_id` / `emotion` fields stay in the packet as an inbox; ignore `clip_id == 0`.
+No locked mapping of poke → wave, PLUS → anything except recenter, or cortex `action` → clip. Cortex `clip_id` / `emotion` fields stay in the packet as an inbox; ignore `clip_id == 0`. A cortex `clip_id` with a non-zero `vox_id` on that clip still grunts — that is clip data, not a new cortex field.
 
 ---
 
-## 12. Optional cortex (Wi-Fi is a mode)
+## 13. Optional cortex (Wi-Fi is a mode)
 
 Radio **off** on battery by default. STA when USB-powered or a persisted “brain” flag and a known AP. No reconnect spin. Failure → lizard.
 
@@ -486,29 +586,29 @@ If/when a think pose exists: set it **immediately** on a cortex-worthy event so 
 
 ---
 
-## 13. Power (~8 h)
+## 14. Power (~8 h, strive)
 
-1000 mAh / 8 h ≈ **125 mA average.**
+1000 mAh / 8 h ≈ **125 mA average.** Strive for it. Chirps on battery are in. Idle I2S is not.
 
 | Lever | Default |
 | :--- | :--- |
 | Backlight PWM | ~30–40% battery; higher on USB; bump on poke, decay |
 | ST7789 | Dirty only |
 | CPU | 240 MHz interacting; 80/160 after a few seconds still |
-| Slack | light-sleep / WFI |
+| Slack | Core 1 WFI per frame. Chip light-sleep **only if mixer idle** |
 | Wi-Fi | Off unless cortex |
-| Audio / I2S / SD | Off |
-| Deep sleep | Face-down, PWR, long idle — RTC restore |
+| Audio | PA + I2S clocks only while a voice is live. ES7210 off. SD off |
+| Deep sleep | Face-down, PWR, long idle — **finish the tail**, PA low, then RTC restore |
 
-USB in = **studio mode** (bright, 30 FPS, no light-sleep, cortex allowed). Unplug = battery personality. Always hold `BAT_EN`. PWR long-press = latch off.
+USB in = **studio mode** (bright, 30 FPS, no light-sleep, cortex allowed, audio may be louder). Unplug = battery personality. Always hold `BAT_EN`. PWR long-press = latch off.
 
 ---
 
-## 14. Development
+## 15. Development
 
 ESP-IDF ≥ 5.5. C++ as a better C: `-fno-exceptions -fno-rtti`.
 
-`esp_lcd` ST7789 + GDMA. Own `CASET`/`RASET`. IMU = I2C FIFO + filter. CST816 on INT. Steal Waveshare **pins only**, not LVGL/XiaoZhi.
+`esp_lcd` ST7789 + GDMA. Own `CASET`/`RASET`. IMU = I2C FIFO + filter. CST816 on INT. I2S TX to ES8311. Steal Waveshare **pins only**, not LVGL/XiaoZhi (not the 24 kHz duplex/AEC stack).
 
 **Bring-up order**
 
@@ -517,15 +617,16 @@ ESP-IDF ≥ 5.5. C++ as a better C: `-fno-exceptions -fno-rtti`.
 3. Indexed FB + dirty-rect dummy sprite.
 4. Complementary filter → **smooth cube** (gravity-locked, continuous orbit). Product test.
 5. One part, 20 idle sheets, blit at live `project(pos)` while `view_idx` follows the camera. Confirm the cube stays smooth and only the photo pops.
-6. Six springs + one idle rest. Sphere poke.
+6. Six springs + one idle rest. Sphere poke. Toys.
 7. Battery idle / GRAM-hold / deadband. Studio vs battery backlight.
-8. UDP cortex last (inbox only). Lizard-brain policy later.
+8. Audio: ES8311 I2C, PA pulse, 12 kHz sine, PA low. Speaker TBD (MX1.25). Then one impact patch from a debug poke; `collide()` → `SfxEvt` (floor, then toy); one clip with `vox_id` plus a toy hit (two voices). GRAM-hold while a tail finishes; confirm PA drops; face-down waits for mixer idle.
+9. UDP cortex last (inbox only). Lizard-brain policy later.
 
 ---
 
-## 15. Checklist
+## 16. Checklist
 
-- [ ] Pins vs schematic; SPI mode 0 vs 3
+- [ ] Pins vs [schematic](refs/ESP32-S3-LCD-1.54-Schematic.pdf); SPI mode 0 vs 3
 - [ ] `BAT_EN`; PWR latch; VBAT
 - [ ] Octal PSRAM 80 MHz; quad flash 80 MHz
 - [ ] Cube world-up; yaw recenter; **camera continuous**; sheet hysteresis
@@ -538,12 +639,15 @@ ESP-IDF ≥ 5.5. C++ as a better C: `-fno-exceptions -fno-rtti`.
 - [ ] When a clip exists: posed sheet + `rest` track + spring lag; no double transform
 - [ ] Poke hits spheres, not pixels
 - [ ] Dirty-rect 30 FPS; GRAM holds when idle
+- [ ] ES8311 I2C; PA gated; 12 kHz sine; ES7210 off
+- [ ] `SfxEvt` from collide (threshold + cooldown); two voices (impact + clip `vox_id`)
+- [ ] Tail finishes; PA low; then light-sleep / face-down
 - [ ] Wi-Fi off: toy is whole
-- [ ] ~8 h dim, radio off (measure)
+- [ ] ~8 h dim, radio off (measure; strive)
 
 ---
 
-## 16. Suggestions
+## 17. Suggestions
 
 1. **Do not snap the camera.** If sheet pop is harsh, hysteresis first, then optional 1-frame blend of two nearest sheets (2× blit — measure). Never quantize `cam_pos`.
 2. **IMU deadband** for GRAM-hold, or 8 h dies from noise-driven 30 Hz. Tune in studio with a plot of `|Δq|`.
@@ -555,20 +659,24 @@ ESP-IDF ≥ 5.5. C++ as a better C: `-fno-exceptions -fno-rtti`.
 8. **USB = studio**, unplug = battery. No settings menu in v1.
 9. **Compile-time SSID** for your LAN.
 10. When the kit lands: swap atlas slices, keep clips that only touch attach points (wave still works if the new arm’s hotspot is the shoulder).
+11. **Gate PA and I2S** even though 8 h is not a hard cap. Silence with MCLK running is the audio version of a static 30 Hz SPI.
+12. If procedural thuds disappoint: fill the pak `pcm` appendix (s8 or ima4 @ 12 kHz) into the **same** voice. Do not add MP3 or the TF slot.
 
 ---
 
-## 17. Open questions
+## 18. Open questions
 
-**Locked this pass:** look-at = pet core. Pixels = indexed-8. Camera elevation clamped (no peek-under). Lizard-brain *policy* (clips, triggers, wander/sleep/think/wave) = later.
+**Locked this pass:** look-at = pet core. Pixels = indexed-8. Camera elevation clamped (no peek-under). Audio = Core 0 2-voice procedural mixer, `vox_id` on clips, `SfxEvt` from collide, ES7210 off. Lizard-brain *policy* (clips, triggers, wander/sleep/think/wave) = later.
 
 1. **Camera `up` (still unknown).** Raw IMU `up` dutch-angles the cube when you roll the device. Orthonormalize against world +Y and tilt only changes azimuth/elevation — floor stays level, more “window on a room,” less “phone roll.” **Try orthonormalize first in studio**; keep a compile-time switch. Pick after you hold the board.
 2. **Part layer order.** Z-sort `pos` vs baked `draw_order[20][PART_COUNT]`? Suggestion still: **baked order per view**; pos-sort toys only.
 3. **Lizard brain** — whole policy TBD. Hunger decay, wander, gaze, sleep, think, wave, poke mappings, cortex `action` → pose. Engine keeps the hooks; do not code a personality yet.
-4. **PLUS** besides recenter? TBD with the brain.
+4. **PLUS** besides recenter? TBD with the brain. Not volume in v1.
+5. **Speaker** on MX1.25 — confirm when the board arrives. Open header is not a driver bug.
+6. **Patch tuning** (`f0`, decay, FM index). Machinery is locked; the sounds are data.
 
 **Already locked, restated:** pet-local `view_idx`, room in live **world** view (yawing the pet must not spin the cube).
 
 ---
 
-The body is a 30 Hz gravity-locked cube on this Waveshare. The window orbits with the IMU. The creature is five photos from 20 baked cameras, hung on six springs that chase authored rests. The lizard brain does not need a PC. The cortex is a guest.
+The body is a 30 Hz gravity-locked cube on this Waveshare. The window orbits with the IMU. The creature is five photos from 20 baked cameras, hung on six springs that chase authored rests. Impacts thud and clips can chirp; the mixer lives on Core 0. The lizard brain does not need a PC. The cortex is a guest.
