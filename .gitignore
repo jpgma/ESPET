@@ -1,0 +1,10 @@
+/build-sim/
+/.vs/
+/out/
+CMakeUserPresets.json
+CMakeCache.txt
+*.user
+*.sdf
+*.suo
+*.VC.db
+*.VC.opendb
