@@ -1,6 +1,6 @@
 # 15 — Audio ES8311 + mixer
 
-← [14 touch](14-touch.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 16 Sleep](16-sleep-and-battery.md) →
+← [14 touch](./14-touch.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 16 Sleep](./16-sleep-and-battery.md) →
 
 **Read:** [guide 07](../guides/07-audio-es8311.md) · [ES8311 user guide](../audio/ES8311.user.Guide.pdf) (clocks, SDP `0x09`/`0x0A`) · [ES8311.DS.pdf](../audio/ES8311.DS.pdf) (register list) · [NS4150B.pdf](../audio/NS4150B.pdf) (CTRL timings) · [architecture 9](../../architecture.md#9-audio-procedural-two-voices)
 
@@ -64,4 +64,4 @@ int32 mix → sat int16 → I2S
 
 Architecture §15 step 8.
 
-← [14 touch](14-touch.md) · [next: 16 Sleep](16-sleep-and-battery.md) →
+← [14 touch](./14-touch.md) · [next: 16 Sleep](./16-sleep-and-battery.md) →

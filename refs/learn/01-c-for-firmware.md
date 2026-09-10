@@ -1,6 +1,6 @@
 # 01 — C for firmware
 
-← [00 start](00-start-here.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 02 How chips talk](02-how-chips-talk.md) →
+← [00 start](./00-start-here.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 02 How chips talk](./02-how-chips-talk.md) →
 
 **Read:** [architecture 0 (style)](../../architecture.md#0-product-lock) · [firmware/main.c](../../firmware/main.c)
 
@@ -136,4 +136,4 @@ You can read `main.c` and say what every type and helper is for. You do not need
 
 Nothing extra. Same C.
 
-← [00 start](00-start-here.md) · [next: 02 How chips talk](02-how-chips-talk.md) →
+← [00 start](./00-start-here.md) · [next: 02 How chips talk](./02-how-chips-talk.md) →

@@ -1,6 +1,6 @@
 # Cheat sheet
 
-Keep this open while coding. Full pin story: [guide 01](../guides/01-board-and-pins.md). Course: [00 start](00-start-here.md). Glossary: [glossary.md](../glossary.md).
+Keep this open while coding. Full pin story: [guide 01](../guides/01-board-and-pins.md). Course: [00 start](./00-start-here.md). Glossary: [glossary.md](../glossary.md).
 
 ## Golden rules
 

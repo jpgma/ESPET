@@ -1,6 +1,6 @@
 # 06 — First pixels
 
-← [05 quaternions](05-quaternions.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 07 Indexed FB](07-indexed-framebuffer.md) →
+← [05 quaternions](./05-quaternions.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 07 Indexed FB](./07-indexed-framebuffer.md) →
 
 **Read:** [guide 03](../guides/03-display-st7789.md) · [ST7789V2.pdf](../display/ST7789V2.pdf) (commands: `0x2A` `CASET`, `0x2B` `RASET`, `0x2C` `RAMWR`, `0x3A` `COLMOD`) · [architecture 2 SPI note](../../architecture.md#2-hardware-map) · [firmware/main.c](../../firmware/main.c)
 
@@ -50,4 +50,4 @@ Architecture §15 step 2:
 
 [Guide 03](../guides/03-display-st7789.md) bring-up test is this lesson on silicon.
 
-← [05 quaternions](05-quaternions.md) · [next: 07 Indexed FB](07-indexed-framebuffer.md) →
+← [05 quaternions](./05-quaternions.md) · [next: 07 Indexed FB](./07-indexed-framebuffer.md) →

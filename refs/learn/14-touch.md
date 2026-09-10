@@ -1,6 +1,6 @@
 # 14 — Touch CST816
 
-← [13 power](13-power-and-boot.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 15 Audio](15-audio.md) →
+← [13 power](./13-power-and-boot.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 15 Audio](./15-audio.md) →
 
 **Read:** [guide 06](../guides/06-touch-cst816.md) · [CST816T register v1.3](../touch/CST816T_register_v1.3.pdf) · [CST816S register declaration](../touch/CST816S_register_declaration.pdf) (English) · [architecture poke](../../architecture.md#8-physics-and-hitboxes)
 
@@ -46,4 +46,4 @@ USB: XY + gesture. Tap → one poke, a sphere reacts. Double-tap → yaw recente
 
 This lesson. Architecture §15 step 6 poke on real glass.
 
-← [13 power](13-power-and-boot.md) · [next: 15 Audio](15-audio.md) →
+← [13 power](./13-power-and-boot.md) · [next: 15 Audio](./15-audio.md) →

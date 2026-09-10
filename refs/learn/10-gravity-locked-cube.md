@@ -1,8 +1,8 @@
 # 10 — Gravity-locked cube
 
-← [09 filter](09-complementary-filter.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 11 Sheets](11-sheets-and-sprites.md) →
+← [09 filter](./09-complementary-filter.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 11 Sheets](./11-sheets-and-sprites.md) →
 
-**Read:** [architecture 1](../../architecture.md#1-gravity-locked-cube-continuous-camera) · [architecture 10 Room](../../architecture.md#10-rendering) · [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [04](04-vectors-matrices-camera.md)
+**Read:** [architecture 1](../../architecture.md#1-gravity-locked-cube-continuous-camera) · [architecture 10 Room](../../architecture.md#10-rendering) · [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [04](./04-vectors-matrices-camera.md)
 
 **Code:** room raster in `firmware/` (e.g. `room.c`). **No pet.** Six quads, live `view`/`proj`, indexed blit + dirty rect from lesson 07.
 
@@ -59,4 +59,4 @@ Drag pitch/roll: you look *into* a room that stays level with the table. Spin: v
 
 Architecture §15 step 4: complementary filter → **smooth cube**. Hold the board. Pick orthonormal-up vs raw `up` with the compile-time switch. Confirm `forward`.
 
-← [09 filter](09-complementary-filter.md) · [next: 11 Sheets](11-sheets-and-sprites.md) →
+← [09 filter](./09-complementary-filter.md) · [next: 11 Sheets](./11-sheets-and-sprites.md) →

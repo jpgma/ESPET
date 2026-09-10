@@ -1,6 +1,6 @@
 # 13 — Power and boot
 
-← [12 springs](12-clips-springs-hitboxes.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 14 Touch](14-touch.md) →
+← [12 springs](./12-clips-springs-hitboxes.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 14 Touch](./14-touch.md) →
 
 **Read:** [guide 01](../guides/01-board-and-pins.md) · [guide 08](../guides/08-power-battery.md) · [guide 02](../guides/02-soc-memory-smp.md) (strapping, USB) · [ETA6098.pdf](../power/ETA6098.pdf) (no I2C; STAT only) · schematic battery page · [architecture 2 and 14](../../architecture.md#2-hardware-map)
 
@@ -49,4 +49,4 @@ Sim: you cannot test this. Keep `BAT_EN` in the real `app_main` anyway so you ne
 
 This *is* the “when.” Architecture §15 step 1 + [guide 09](../guides/09-bring-up.md) row 1.
 
-← [12 springs](12-clips-springs-hitboxes.md) · [next: 14 Touch](14-touch.md) →
+← [12 springs](./12-clips-springs-hitboxes.md) · [next: 14 Touch](./14-touch.md) →

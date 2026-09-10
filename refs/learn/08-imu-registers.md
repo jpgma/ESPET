@@ -1,6 +1,6 @@
 # 08 — IMU registers
 
-← [07 FB](07-indexed-framebuffer.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 09 Filter](09-complementary-filter.md) →
+← [07 FB](./07-indexed-framebuffer.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 09 Filter](./09-complementary-filter.md) →
 
 **Read:** [guide 04](../guides/04-imu-qmi8658.md) · [QMI8658A datasheet](../imu/QMI8658A_Datasheet_Rev_A.pdf) (WHO_AM_I, CTRL2/3/7, FIFO_* ) · [architecture 4 Core 0 prio 12](../../architecture.md#4-core-allocation)
 
@@ -57,4 +57,4 @@ Drag: accel vector moves, gyro spikes while moving, quiets when you stop. `WHO_A
 
 100 Hz print, `|a| ≈ 1` at rest, FIFO overflow count 0, INT rate ~100 Hz. [Guide 04](../guides/04-imu-qmi8658.md) test.
 
-← [07 FB](07-indexed-framebuffer.md) · [next: 09 Filter](09-complementary-filter.md) →
+← [07 FB](./07-indexed-framebuffer.md) · [next: 09 Filter](./09-complementary-filter.md) →

@@ -1,19 +1,21 @@
 # 00 — Start here
 
-[index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 01 C for firmware](01-c-for-firmware.md) →
+[index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 01 C for firmware](./01-c-for-firmware.md) →
 
 You are going to program a tiny computer that lives on a cube-shaped toy: the [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). The product is described in [architecture.md](../../architecture.md). This course assumes you have written programs before, but **not** firmware, **not** C, and **not** 3D math.
+
+In Cursor, **Ctrl+click** a link in the markdown source, or open **Markdown: Open Preview to the Side** (`Ctrl+Shift+V`). The Preview/Markdown toggle in the tab does not open local files (it looks under `C:\` and reports them missing).
 
 ## Two kinds of docs
 
 | Folder | Who it is for |
 | :--- | :--- |
-| [learn/](00-start-here.md) (this course) | You. Concepts, vocabulary, code you write, checkpoints. |
+| [learn/](./00-start-here.md) (this course) | You. Concepts, vocabulary, code you write, checkpoints. |
 | [guides/](../guides/01-board-and-pins.md) | Future you. Blunt “which PDF page, which register.” No teaching. |
 
 When a lesson says **Read**, open those files. Do not try to read a datasheet cover to cover.
 
-Keep [glossary.md](../glossary.md) and [cheatsheet.md](cheatsheet.md) open in other tabs.
+Keep [glossary.md](../glossary.md) and [cheatsheet.md](./cheatsheet.md) open in other tabs.
 
 ## How you work each day
 
@@ -44,31 +46,31 @@ Growing the simulator is a separate job. Do not stall a lesson waiting for it.
 
 Fundamentals
 
-- [ ] [01 C for firmware](01-c-for-firmware.md)
-- [ ] [02 How chips talk](02-how-chips-talk.md)
-- [ ] [03 Tasks, cores, timing](03-tasks-cores-timing.md)
-- [ ] [04 Vectors, matrices, camera](04-vectors-matrices-camera.md)
-- [ ] [05 Quaternions](05-quaternions.md)
+- [ ] [01 C for firmware](./01-c-for-firmware.md)
+- [ ] [02 How chips talk](./02-how-chips-talk.md)
+- [ ] [03 Tasks, cores, timing](./03-tasks-cores-timing.md)
+- [ ] [04 Vectors, matrices, camera](./04-vectors-matrices-camera.md)
+- [ ] [05 Quaternions](./05-quaternions.md)
 
 Build in sim
 
-- [ ] [06 First pixels](06-first-pixels.md)
-- [ ] [07 Indexed framebuffer and dirty rect](07-indexed-framebuffer.md)
-- [ ] [08 IMU registers](08-imu-registers.md)
-- [ ] [09 Complementary filter](09-complementary-filter.md)
-- [ ] [10 Gravity-locked cube](10-gravity-locked-cube.md)
-- [ ] [11 Sheets and sprites](11-sheets-and-sprites.md)
-- [ ] [12 Clips, springs, hitboxes](12-clips-springs-hitboxes.md)
+- [ ] [06 First pixels](./06-first-pixels.md)
+- [ ] [07 Indexed framebuffer and dirty rect](./07-indexed-framebuffer.md)
+- [ ] [08 IMU registers](./08-imu-registers.md)
+- [ ] [09 Complementary filter](./09-complementary-filter.md)
+- [ ] [10 Gravity-locked cube](./10-gravity-locked-cube.md)
+- [ ] [11 Sheets and sprites](./11-sheets-and-sprites.md)
+- [ ] [12 Clips, springs, hitboxes](./12-clips-springs-hitboxes.md)
 
 Real board (read now)
 
-- [ ] [13 Power and boot](13-power-and-boot.md)
-- [ ] [14 Touch](14-touch.md)
-- [ ] [15 Audio](15-audio.md)
-- [ ] [16 Sleep and battery](16-sleep-and-battery.md)
+- [ ] [13 Power and boot](./13-power-and-boot.md)
+- [ ] [14 Touch](./14-touch.md)
+- [ ] [15 Audio](./15-audio.md)
+- [ ] [16 Sleep and battery](./16-sleep-and-battery.md)
 
 ## If you get lost
 
 Product in one paragraph: [architecture 0](../../architecture.md#0-product-lock).  
-Pins: [cheat sheet](cheatsheet.md).  
+Pins: [cheat sheet](./cheatsheet.md).  
 Bring-up order on silicon: [guide 09](../guides/09-bring-up.md).

@@ -1,6 +1,6 @@
 # 16 — Sleep and battery
 
-← [15 audio](15-audio.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [00 start](00-start-here.md)
+← [15 audio](./15-audio.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [00 start](./00-start-here.md)
 
 **Read:** [guide 08](../guides/08-power-battery.md) · [architecture 14](../../architecture.md#14-power-8-h-strive) · IDF sleep + PM (linked from the guide) · [architecture 4 slack](../../architecture.md#4-core-allocation)
 
@@ -46,4 +46,4 @@ Architecture §15 step 7 + 8 tail/sleep bullets + [guide 09](../guides/09-bring-
 
 You now have the machinery. Policy (wander, wave, think) stays TBD.
 
-← [15 audio](15-audio.md) · [00 start](00-start-here.md)
+← [15 audio](./15-audio.md) · [00 start](./00-start-here.md)

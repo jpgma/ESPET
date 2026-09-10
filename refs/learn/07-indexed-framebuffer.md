@@ -1,6 +1,6 @@
 # 07 — Indexed framebuffer and dirty rect
 
-← [06 pixels](06-first-pixels.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 08 IMU](08-imu-registers.md) →
+← [06 pixels](./06-first-pixels.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 08 IMU](./08-imu-registers.md) →
 
 **Read:** [architecture 3. Memory](../../architecture.md#3-memory) · [architecture 10 dirty rect](../../architecture.md#10-rendering) · [guide 03](../guides/03-display-st7789.md) · [guide 02 memory law](../guides/02-soc-memory-smp.md)
 
@@ -53,4 +53,4 @@ Wait the **previous** DMA before kicking the next, not after physics in a way th
 
 Architecture §15 step 3: indexed FB + dirty dummy sprite. Print rect pixel count × 16 / spi_hz vs measured µs.
 
-← [06 pixels](06-first-pixels.md) · [next: 08 IMU](08-imu-registers.md) →
+← [06 pixels](./06-first-pixels.md) · [next: 08 IMU](./08-imu-registers.md) →

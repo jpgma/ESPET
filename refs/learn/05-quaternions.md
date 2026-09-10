@@ -1,6 +1,6 @@
 # 05 — Quaternions and rotation
 
-← [04 vectors](04-vectors-matrices-camera.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 06 First pixels](06-first-pixels.md) →
+← [04 vectors](./04-vectors-matrices-camera.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 06 First pixels](./06-first-pixels.md) →
 
 **Read:** [architecture 1 (6-axis IMU)](../../architecture.md#6-axis-imu-tilt-yes-compass-no) · [guide 05](../guides/05-fusion-gravity-camera.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) (IMU-only sections; skip magnetometer)
 
@@ -84,4 +84,4 @@ You can say out loud: “gravity gives me two axes; the third is dead reckoning.
 
 Plot `|q|` (should stay ~1), `|a|` at rest (~1 g), and yaw while the toy sits still (should be quiet) vs while you spin it (should move, then need recenter).
 
-← [04 vectors](04-vectors-matrices-camera.md) · [next: 06 First pixels](06-first-pixels.md) →
+← [04 vectors](./04-vectors-matrices-camera.md) · [next: 06 First pixels](./06-first-pixels.md) →

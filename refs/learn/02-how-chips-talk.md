@@ -1,6 +1,6 @@
 # 02 — How chips talk
 
-← [01 C](01-c-for-firmware.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 03 Tasks](03-tasks-cores-timing.md) →
+← [01 C](./01-c-for-firmware.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 03 Tasks](./03-tasks-cores-timing.md) →
 
 **Read:** [guide 01](../guides/01-board-and-pins.md) · [architecture 2. Hardware map](../../architecture.md#2-hardware-map) · schematic [ESP32-S3-LCD-1.54-Schematic.pdf](../ESP32-S3-LCD-1.54-Schematic.pdf) (skim the net names only)
 
@@ -75,7 +75,7 @@ DMA cannot always see [PSRAM](../glossary.md#psram) the way the CPU cache does. 
 
 ## Exercise
 
-On the [cheat sheet](cheatsheet.md), highlight: which pins are I2C, which are SPI, which are “just GPIO.” Check the schematic net names match architecture §2. If they disagree, schematic wins.
+On the [cheat sheet](./cheatsheet.md), highlight: which pins are I2C, which are SPI, which are “just GPIO.” Check the schematic net names match architecture §2. If they disagree, schematic wins.
 
 ## Checkpoint
 
@@ -85,4 +85,4 @@ You can explain, without looking, why four chips share 41/42 and why the LCD has
 
 [Guide 01](../guides/01-board-and-pins.md) bring-up: `BAT_EN` high, USB prints hello. That is lesson 13. Today you only need the map.
 
-← [01 C](01-c-for-firmware.md) · [next: 03 Tasks](03-tasks-cores-timing.md) →
+← [01 C](./01-c-for-firmware.md) · [next: 03 Tasks](./03-tasks-cores-timing.md) →

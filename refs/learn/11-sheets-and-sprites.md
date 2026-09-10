@@ -1,6 +1,6 @@
 # 11 — Sheets and sprites
 
-← [10 cube](10-gravity-locked-cube.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 12 Springs](12-clips-springs-hitboxes.md) →
+← [10 cube](./10-gravity-locked-cube.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 12 Springs](./12-clips-springs-hitboxes.md) →
 
 **Read:** [architecture 1 continuous vs discrete](../../architecture.md#continuous-camera-discrete-sheets) · [architecture 10 Pet](../../architecture.md#10-rendering) · [architecture 11 Asset pipeline](../../architecture.md#11-asset-pipeline-pc)
 
@@ -69,4 +69,4 @@ Room still smooth. A single “part” pops through 20 looks as you orbit. Top-d
 
 Architecture §15 step 5: one part, 20 idle sheets, blit at live `project(pos)` while `view_idx` follows. Cube stays smooth; only the photo pops.
 
-← [10 cube](10-gravity-locked-cube.md) · [next: 12 Springs](12-clips-springs-hitboxes.md) →
+← [10 cube](./10-gravity-locked-cube.md) · [next: 12 Springs](./12-clips-springs-hitboxes.md) →

@@ -1,6 +1,6 @@
 # 04 — Vectors, matrices, camera
 
-← [03 tasks](03-tasks-cores-timing.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 05 Quaternions](05-quaternions.md) →
+← [03 tasks](./03-tasks-cores-timing.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 05 Quaternions](./05-quaternions.md) →
 
 **Read:** [architecture 1. Gravity-locked cube](../../architecture.md#1-gravity-locked-cube-continuous-camera) (the camera formulas) · [architecture 10. Rendering](../../architecture.md#10-rendering)
 
@@ -83,4 +83,4 @@ On paper, with the board screen-up on a table: world `+Y` up, gravity `-Y`, came
 
 Confirm `forward = rotate(q, {0,0,-1})` really is “into the glass.” If the cube yaws the wrong way, negate one axis here, not in the filter.
 
-← [03 tasks](03-tasks-cores-timing.md) · [next: 05 Quaternions](05-quaternions.md) →
+← [03 tasks](./03-tasks-cores-timing.md) · [next: 05 Quaternions](./05-quaternions.md) →

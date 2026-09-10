@@ -1,8 +1,8 @@
 # 09 — Complementary filter
 
-← [08 IMU](08-imu-registers.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 10 Cube](10-gravity-locked-cube.md) →
+← [08 IMU](./08-imu-registers.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 10 Cube](./10-gravity-locked-cube.md) →
 
-**Read:** [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [05 Quaternions](05-quaternions.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) IMU chapters · [architecture 1](../../architecture.md#1-gravity-locked-cube-continuous-camera)
+**Read:** [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [05 Quaternions](./05-quaternions.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) IMU chapters · [architecture 1](../../architecture.md#1-gravity-locked-cube-continuous-camera)
 
 **Code:** `firmware/filter.c` (or similar). Input: accel (g), gyro (rad/s), `dt`. Output: unit `q_device_to_world`, `grav[]`, `jerk`. Publish into a `SharedSnap`-shaped struct even if only one thread reads it.
 
@@ -50,4 +50,4 @@ No cube yet. You may keep the tinted fill.
 
 Architecture §15 step 4 **product test** is lesson 10. This lesson on silicon: same prints, 100 Hz, no FIFO overflow.
 
-← [08 IMU](08-imu-registers.md) · [next: 10 Cube](10-gravity-locked-cube.md) →
+← [08 IMU](./08-imu-registers.md) · [next: 10 Cube](./10-gravity-locked-cube.md) →

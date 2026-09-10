@@ -1,6 +1,6 @@
 # 03 — Tasks, cores, timing
 
-← [02 buses](02-how-chips-talk.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 04 Vectors](04-vectors-matrices-camera.md) →
+← [02 buses](./02-how-chips-talk.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 04 Vectors](./04-vectors-matrices-camera.md) →
 
 **Read:** [architecture 4. Core allocation](../../architecture.md#4-core-allocation) · [architecture 5. Inter-core state](../../architecture.md#5-inter-core-state-seqlock-dram-only) · [guide 02](../guides/02-soc-memory-smp.md) (SMP + memory law)
 
@@ -81,4 +81,4 @@ You can draw Core 0 vs Core 1 on paper and say what is forbidden (Core 1 blockin
 
 Pin tasks for real. USB [CDC](../glossary.md#usb-cdc) logs which core a task is on (`xPortGetCoreID()`). Confirm IMU drain is Core 0.
 
-← [02 buses](02-how-chips-talk.md) · [next: 04 Vectors](04-vectors-matrices-camera.md) →
+← [02 buses](./02-how-chips-talk.md) · [next: 04 Vectors](./04-vectors-matrices-camera.md) →

@@ -1,6 +1,6 @@
 # 12 — Clips, springs, hitboxes
 
-← [11 sheets](11-sheets-and-sprites.md) · [index](00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](cheatsheet.md) · [next: 13 Power](13-power-and-boot.md) →
+← [11 sheets](./11-sheets-and-sprites.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 13 Power](./13-power-and-boot.md) →
 
 **Read:** [architecture 6](../../architecture.md#6-runtime-representation-not-a-skeleton) · [architecture 7](../../architecture.md#7-clips-animation-writes-rest-not-pos) · [architecture 8](../../architecture.md#8-physics-and-hitboxes) · golden rules 5–8
 
@@ -74,4 +74,4 @@ Architecture §15 step 6: six springs + idle rest. Sphere poke. Toys. Touch wiri
 
 Do not implement lizard personality.
 
-← [11 sheets](11-sheets-and-sprites.md) · [next: 13 Power](13-power-and-boot.md) →
+← [11 sheets](./11-sheets-and-sprites.md) · [next: 13 Power](./13-power-and-boot.md) →
