@@ -8,7 +8,7 @@
 
 ## Why indexed-8
 
-A 240×240 RGB565 frame is 115200 bytes. Two of them plus Wi-Fi DMA in internal RAM does not fit the product. Indexed-8 is 57600 bytes per buffer. Colour 0 = [key](../glossary.md#color-key) (transparent in sprites). Palette has 32 real colours; a 256-slot table is still fine if slot 32…255 unused.
+A 240×240 RGB565 frame is 115200 bytes. Two of them plus Wi-Fi DMA in internal RAM does not fit the product. Indexed-8 is 57600 bytes per buffer. Colour 0 = [key](../glossary.md#color-key) (transparent in sprites). Palette has 32 real colours; a 256-slot table is still fine if slot 32…255 unused. **Per-room palettes** (1–15 actors / 16–31 scenery) arrive with Hall; this lesson is one table.
 
 **Scanout:** indexed back buffer → expand dirty rows to RGB565 bounce → [GDMA](../glossary.md#gdma) to ST7789.
 
@@ -38,7 +38,7 @@ A 120×140 RGB565 rect ≈ 7 ms @ 40 MHz. Full frame ≈ 23 ms. Budget lives or 
 
 ## GRAM-hold
 
-If nothing moved, **do not SPI**. The panel [GRAM](../glossary.md#gram) keeps the last picture. Later the IMU always twitches: you will need `|Δq|` / `|Δcam|` deadband (lesson 10). For this lesson: skip `draw_bitmap` when the dummy sprite AABB did not change.
+If nothing moved, **do not SPI**. The panel [GRAM](../glossary.md#gram) keeps the last picture. Later: skip when springs/toys settled and `fx_live==0` (architecture §4) — **not** `|Δq|`. For this lesson: skip `draw_bitmap` when the dummy sprite AABB did not change.
 
 Wait the **previous** DMA before kicking the next, not after physics in a way that stalls Core 0 (there is only one thread in sim; still structure it).
 

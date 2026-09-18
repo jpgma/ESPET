@@ -28,7 +28,7 @@ The window is a fake 240×240 panel. Dragging it tilts a fake [IMU](../glossary.
 
 ## What you will not invent
 
-[Lizard-brain](../glossary.md#lizard-brain) behaviour (when the pet waves, sleeps, thinks) is **TBD** in the architecture. Lessons stop at the machinery: rest tables, clips, `clip_id`, springs, sound events. Do not code a personality.
+[Lizard-brain](../glossary.md#lizard-brain) *when* (waves, sleeps, thinks) is **TBD**. Lessons stop at the machinery: rest tables, clips, `clip_id`, springs, sound events, room swap. Spatial hooks (Nest / Play / Hall / Yard, Hall eat, FX) are locked; do not code a personality.
 
 ## Sim vs real board
 
@@ -58,7 +58,7 @@ Build in sim
 - [ ] [07 Indexed framebuffer and dirty rect](./07-indexed-framebuffer.md)
 - [ ] [08 IMU registers](./08-imu-registers.md)
 - [ ] [09 Complementary filter](./09-complementary-filter.md)
-- [ ] [10 Gravity-locked cube](./10-gravity-locked-cube.md)
+- [ ] [10 Gravity-locked cube](./10-gravity-locked-cube.md) (authored room; IMU bounce, not orbit)
 - [ ] [11 Sheets and sprites](./11-sheets-and-sprites.md)
 - [ ] [12 Clips, springs, hitboxes](./12-clips-springs-hitboxes.md)
 

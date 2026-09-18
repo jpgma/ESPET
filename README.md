@@ -1,6 +1,6 @@
 # ESPET
 
-Gravity-locked cube pet on a [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). Product rules: [architecture.md](architecture.md).
+Gravity-locked habitat of cube rooms on a [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). Small rooms are the close-up pet; large rooms are the house — a floor shadow, plants you walk behind, a bowl you munch at. Product rules: [architecture.md](architecture.md).
 
 ## Two pieces (do not mix them)
 
@@ -9,7 +9,7 @@ Gravity-locked cube pet on a [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.wa
 | [`firmware/`](firmware/) | The program that will run on the ESP32. Talks to the LCD (`esp_lcd`) and IMU (I2C QMI8658). **No SDL, no mouse, no cube renderer in the simulator.** |
 | [`board-sim/`](board-sim/) | A fake Waveshare: 240×240 ST7789 window + mouse-drag feeding QMI8658-like accel/gyro. Your firmware does not know this exists. |
 
-The cube, springs, and pet are firmware work you add later. The simulator never draws a cube.
+The rooms, springs, and pet are firmware work you add later. The simulator never draws a habitat.
 
 ## Daily loop (Windows)
 
@@ -19,7 +19,13 @@ You already have Visual Studio 18. `sim.bat` looks up an install that has the **
 sim.bat
 ```
 
-That configures if needed, builds **Release**, and opens the panel. First run downloads SDL2 (needs network once).
+That configures if needed, builds **Release**, and opens the panel. First run downloads SDL2 (needs network once). To step through firmware in the IDE (breakpoints in `firmware/main.c`):
+
+```text
+debug.bat
+```
+
+That opens the generated solution (`build-sim\espet-board-sim.slnx` on VS 18) in Visual Studio Community (the IDE on `F:`, not Build Tools). Pick **Debug / x64** and press F5. Do not run `sim.bat` at the same time.
 
 | Command | Meaning |
 | :--- | :--- |
@@ -29,6 +35,7 @@ That configures if needed, builds **Release**, and opens the panel. First run do
 | `sim.bat --no-run` | build only |
 | `sim.bat --run-only` | skip build; launch last exe |
 | `sim.bat --help` | flags |
+| `debug.bat` | open the sim in Visual Studio for F5 debugging |
 
 Optional fake SPI cost (off by default):
 

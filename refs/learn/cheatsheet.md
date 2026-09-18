@@ -8,9 +8,9 @@ Keep this open while coding. Full pin story: [guide 01](../guides/01-board-and-p
 2. The pet is complete with the radio off.
 3. World down is real gravity. The screen is a camera, not a world axis.
 4. Sleeping the CPU is a feature. Idle I2S clocks or PA up is the same bug as a static 30 Hz SPI.
-5. Sheets are appearance. Springs are state. Pixels are not physics.
+5. Sheets are appearance. Springs are state. Pixels are not physics. LOD is blit, not sim.
 6. Animation and the matching sheet frame are the same pose. Springs only lag.
-7. The camera is continuous. Only `view_idx` is discrete.
+7. The camera is room-authored and static per room. Only yaw `view_idx` (0..3) is discrete.
 8. Core 1 never plays audio. It may emit `SfxEvt`. Core 0 mixes.
 
 ## Pins (architecture §2)
@@ -28,7 +28,7 @@ Confirm once on [the schematic](../ESP32-S3-LCD-1.54-Schematic.pdf).
 | I2S MCLK / BCLK / WS / DIN / DOUT | 8 / 9 / 10 / 11 / 12 | DIN unused v1 |
 | BAT_EN | 2 | Hold high |
 | VBAT ADC / CHG | 1 / 3 | Housekeeping |
-| PWR / PLUS / BOOT | 5 / 4 / 0 | PLUS = recenter |
+| PWR / PLUS / BOOT | 5 / 4 / 0 | PLUS = lizard one-shot (not camera recenter) |
 | USB D− / D+ | 19 / 20 | Native CDC / JTAG |
 
 ## I2C (Core 0 owner)
@@ -79,7 +79,7 @@ Full 240×240 RGB565 @ 40 MHz ≈ 23 ms → 30 FPS + dirty rect.
 
 | Name | Addr | |
 | :--- | :--- | :--- |
-| GestureID | `0x01` | `0x0B` = double-click = recenter |
+| GestureID | `0x01` | `0x0B` = double-click = lizard one-shot |
 | FingerNum | `0x02` | |
 | XY | `0x03`–`0x06` | |
 | ChipID | `0xA7` | log at boot |
@@ -109,9 +109,11 @@ C++: `-fno-exceptions -fno-rtti`. IDF ≥ 5.5.
 ## Memory one-liners
 
 - Indexed-8 FB in DRAM (2×57.6 KB). RGB565 bounce for SPI.
-- Mixer and blit never touch PSRAM.
-- Atlas: flash XIP, PSRAM if cache thrashes.
-- RTC: hunger/happy/sleep/emotion.
+- Current **room palette** 32 (64 B), copy on door. Index 0 = key; 1–15 actors; 16–31 scenery.
+- Mixer and blit never touch PSRAM. Backdrop restore may copy PSRAM → DRAM fb.
+- Atlas: flash XIP, PSRAM if cache thrashes. Current room backdrop in PSRAM (57.6 KB).
+- `FxPool` ~2 KB DRAM. GRAM-hold: springs/toys settled **and** `fx_live==0`.
+- RTC: hunger/happy/sleep/emotion/`room_id`.
 
 ## Rates
 

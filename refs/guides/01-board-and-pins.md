@@ -33,7 +33,7 @@ Confirm these GPIO numbers on the schematic once. Then they are constants in fir
 | I2S | 8 / 9 / 10 / 11 / 12 | MCLK / BCLK / WS / DIN / DOUT. DIN unused v1 |
 | BAT_EN | 2 | **Hold high** or the board dies on battery |
 | VBAT ADC / charging | 1 / 3 | Housekeeping. Not a PMIC. |
-| PWR / PLUS / BOOT | 5 / 4 / 0 | PWR long-press = latch off. PLUS = recenter |
+| PWR / PLUS / BOOT | 5 / 4 / 0 | PWR long-press = latch off. PLUS = lizard one-shot (not camera recenter) |
 | USB D− / D+ | 19 / 20 | Native USB Serial/JTAG. No CH340. |
 
 ## Shared I2C (the real constraint)

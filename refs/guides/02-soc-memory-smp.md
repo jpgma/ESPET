@@ -64,10 +64,10 @@ IDF:
 
 | Region | Put here | Never here |
 | :--- | :--- | :--- |
-| Internal DRAM | Two indexed-8 FBs (2×57.6 KB), RGB565 scanline bounce, `Bodies`, seqlock, `SfxEvt` ring, two synth voices, 256-sample mix bounce, blit inner loop | Wi-Fi DMA buffers if you also keep dual RGB565 (you will not) |
-| Octal PSRAM | Atlas pixels **if** XIP cache thrash shows up | Framebuffer, mixer, Wi-Fi DMA |
-| 16 MB quad NOR | Firmware, clips, `sprite_id`, atlas, 20 vertices, `SynthPatch[]`. XIP for cold tables | PCM in v1 |
-| RTC SRAM | Hunger, happy, sleep, last emotion | Anything in the 33 ms loop |
+| Internal DRAM | Two indexed-8 FBs (2×57.6 KB), room palette 32, RGB565 scanline bounce, `Bodies`, `FxPool`, seqlock, `SfxEvt` ring, two synth voices, 256-sample mix bounce, blit inner loop | Wi-Fi DMA buffers if you also keep dual RGB565 (you will not) |
+| Octal PSRAM | **Current room backdrop** (57.6 KB), optional prefetch, atlas if XIP thrash | Framebuffer, mixer, Wi-Fi DMA |
+| 16 MB quad NOR | Firmware, clips, `sprite_id`, atlas, rooms/backdrops, **per-room palettes**, 4 yaw headings, FX stamps, `SynthPatch[]`. XIP for cold tables | PCM in v1 |
+| RTC SRAM | Hunger, happy, sleep, last emotion, `room_id` | Anything in the 33 ms loop |
 
 Wi-Fi DMA cannot live in PSRAM. That is why the product is indexed-8 in DRAM, not dual RGB565 + radio.
 
@@ -78,7 +78,7 @@ Wi-Fi DMA cannot live in PSRAM. That is why the product is indexed-8 in DRAM, no
 | Core | Jobs |
 | :--- | :--- |
 | 0 | IMU 100 Hz, touch IRQ, lizard 20 Hz, mixer, backlight/VBAT, optional Wi-Fi |
-| 1 | One pinned task: snapshot → springs → camera → dirty SPI → WFI until 33.3 ms |
+| 1 | One pinned task: snapshot → IMU evt → springs → yaw sheet → dirty SPI → WFI until 33.3 ms |
 
 Core 1 **never** waits on Core 0, I2S, or the radio. Sound is fire-and-forget `SfxEvt`.
 

@@ -13,7 +13,7 @@
 - Core 0 mixer, **two voices**, procedural patches, **no PCM**, no TF, no MP3.
 - 12 kHz mono, block 256 samples, I2S GDMA → ES8311.
 - [ES7210](../glossary.md#es7210) **off**. DIN GPIO11 unused.
-- Volume fixed. PLUS is recenter.
+- Volume fixed. PLUS is not volume (lizard one-shot).
 - Core 1 never plays audio. It emits `SfxEvt`.
 
 Steal pins, not XiaoZhi’s 24 kHz duplex/AEC stack.

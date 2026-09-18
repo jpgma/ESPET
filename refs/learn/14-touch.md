@@ -16,7 +16,7 @@ Reset: RST low ~10 ms, high, wait 50–100 ms, then I2C. Datasheet timing beats 
 
 | Addr | Use |
 | :--- | :--- |
-| `0x01` GestureID | `0x05` click, **`0x0B` double-click = recenter**, `0x0C` long (ignore v1) |
+| `0x01` GestureID | `0x05` click, **`0x0B` double-click = one-shot** (lizard TBD), `0x0C` long (ignore v1) |
 | `0x02` FingerNum | 0 or 1 |
 | `0x03`–`0x06` XY | 12-bit. Map to UV 0…1 in 240×240. Watch MADCTL vs axes |
 | `0xEC` MotionMask | bit0 `EnDClick` on |
@@ -29,18 +29,18 @@ Core 0, prio 11, **event**:
 
 1. GPIO48 ISR → wake a task (no I2C in ISR).
 2. Burst-read gesture + XY.
-3. `0x0B` → `recenter` one-shot in seqlock.
+3. `0x0B` → `double_tap` one-shot in seqlock (lizard TBD; not camera recenter).
 4. Else finger → `poke`, `poke_u`, `poke_v`.
 
-Core 1 unprojects and tests spheres (lesson 12). Touch code does not know what a nose is.
+Core 1 unprojects and tests spheres in S rooms (lesson 12). L rooms use screen-space slop. Touch code does not know what a nose is.
 
 Same I2C bus as IMU: Core 0 owner serializes. Core 1 never takes the bus.
 
-PLUS short-press is the other recenter path (GPIO4). Same `recenter` bit.
+PLUS short-press is the other lizard one-shot (GPIO4). Same idea, `plus` bit — not yaw recenter.
 
 ## Checkpoint (silicon)
 
-USB: XY + gesture. Tap → one poke, a sphere reacts. Double-tap → yaw recenter. INT is events, not 100 Hz polling. Auto-sleep does not steal the first tap (or you disabled it).
+USB: XY + gesture. Tap → one poke, a sphere reacts (S). Double-tap → `double_tap` one-shot (log it; mapping TBD). INT is events, not 100 Hz polling. Auto-sleep does not steal the first tap (or you disabled it).
 
 ## When the board arrives
 

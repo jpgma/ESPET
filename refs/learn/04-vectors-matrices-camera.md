@@ -2,9 +2,9 @@
 
 ← [03 tasks](./03-tasks-cores-timing.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 05 Quaternions](./05-quaternions.md) →
 
-**Read:** [architecture 1. Gravity-locked cube](../../architecture.md#1-gravity-locked-cube-continuous-camera) (the camera formulas) · [architecture 10. Rendering](../../architecture.md#10-rendering)
+**Read:** [architecture 1. Gravity-locked habitat](../../architecture.md#1-gravity-locked-habitat-authored-camera) (the camera formulas) · [architecture 10. Rendering](../../architecture.md#10-rendering)
 
-You will raster a room as **six quads** from a live camera. This lesson is the math. No pixels yet — lesson 10 uses these functions.
+You will project points through a **room-authored** camera. This lesson is the math. No pixels yet — lesson 10 uses these functions.
 
 ## Vectors
 
@@ -12,7 +12,7 @@ A 3D [vector](../glossary.md#vector) is `(x, y, z)`.
 
 - **Length:** `|v| = sqrt(x²+y²+z²)`.
 - **[Normalize](../glossary.md#normalize):** `v / |v|` → length 1. Directions only.
-- **[Dot](../glossary.md#dot-product):** `a·b = axbx+ayby+azbz`. Positive = same hemisphere. `argmax(dot(dir, dodeca[i]))` picks a sheet.
+- **[Dot](../glossary.md#dot-product):** `a·b = axbx+ayby+azbz`. Positive = same hemisphere. `yaw_quad` picks a sheet from four headings this way.
 - **[Cross](../glossary.md#cross-product):** `a×b` is perpendicular to both. You need it for `look_at` (camera axes) and for the IMU error `a × predicted_down`.
 
 Write four helpers you will keep: `vec3_add`, `vec3_scale`, `vec3_dot`, `vec3_cross`, `vec3_norm`. Put them in something like `firmware/math3.c` when you start lesson 10, or a notebook until then.
@@ -26,10 +26,11 @@ Same point, different numbers:
 | **World** | Cube glued to Earth. `+Y` = up = opposite gravity. Floor on XZ. |
 | **Body** | Pet. Core at origin, `+Y` up, yaw 0. Springs live here. |
 | **Device** | The physical chip/screen. IMU measures here. |
+| **Room** | Authored 3/4 camera. `front` is a yaw around world +Y. |
 
-Architecture: simulate in body space. One 3×4 (translate + yaw) maps body → world for projection, core-vs-cube collision, and camera focus.
+Architecture: simulate in body space. One 3×4 (translate + yaw) maps body → world for projection and core-vs-room collision. The screen camera is **not** the device frame.
 
-**Tilt does not change world gravity.** Springs always use world `-Y` mapped into body. The pet does not lean with the glass.
+**Tilt does not change world gravity.** Springs always use world `-Y` mapped into body. The pet does not lean with the glass. The window does not orbit.
 
 ## Matrices
 
@@ -39,14 +40,14 @@ You do not need a linear-algebra library. 4×4 multiply and invert-of-rigid-tran
 
 ## `look_at`
 
-[architecture §1](../../architecture.md#1-gravity-locked-cube-continuous-camera):
+[architecture §1](../../architecture.md#1-gravity-locked-habitat-authored-camera):
 
 ```
-forward = rotate(q, {0,0,-1})     // into the screen; confirm on bring-up
-focus   = pet core
-cam_pos = focus - forward * boom
-view    = look_at(cam_pos, focus, up)
+view = room.view     // authored 3/4; elev ~40°; azimuth = room.front
+proj = room.proj     // perspective ~55°, aspect 1.0
 ```
+
+You still write `look_at` so a room record can store eye / target / up instead of a baked matrix.
 
 `look_at(eye, target, up)`:
 
@@ -55,9 +56,9 @@ view    = look_at(cam_pos, focus, up)
 3. `yaxis = cross(zaxis, xaxis)`
 4. Pack into a view matrix.
 
-**Open question:** raw IMU `up` dutch-angles the cube when you roll. **Try orthonormalizing `up` against world +Y first** (floor stays level). Compile-time switch.
+**S rooms:** target = pet core (frame the creature). **L rooms:** target = room centre (frame the cube). IMU `q` is not an input.
 
-**Elevation clamp:** if the camera would look from below ~12°, lift it. No peek-under. `view_idx` only among vertices in that hemisphere.
+`up` is world +Y (or a slight room tilt that is **authored**, not from roll). Do not dutch-angle the habitat from the phone.
 
 ## Perspective
 
@@ -69,18 +70,20 @@ After `clip = proj * view * world_point`, [perspective divide](../glossary.md#pe
 
 ## AABB
 
-An [AABB](../glossary.md#aabb) is a screen-space box: min/max x, y. Dirty rect = union of projected part AABBs + margin. That window is what you send over SPI.
+An [AABB](../glossary.md#aabb) is a screen-space box: min/max x, y. Dirty rect = union of projected moving AABBs + margin. That window is what you send over SPI.
 
-## Boom
+## Yaw sheets
 
-FOV ~55°, pet ~1/3 of the frame, camera outside the cube. Same FOV/boom in Blender so sheet scale is in the ballpark. Off-vertex they will not match pixel-perfect. That mismatch is accepted.
+Four headings in XZ: front, right, back, left, relative to `room.front`. `view_idx = yaw_quad(pet_yaw - room.front)` with [hysteresis](../glossary.md#hysteresis). The camera does not move when the pet turns; the **photo** does.
+
+FOV ~55°, same in Blender as runtime. S bake: pet ~1/3 of the frame. L bake: pet ~24–32 px.
 
 ## Checkpoint
 
-On paper, with the board screen-up on a table: world `+Y` up, gravity `-Y`, camera looking at the pet core. You can say why spinning the toy on the table is *yaw* and why that will drift (lesson 05).
+On paper, with the board screen-up on a table: world `+Y` up, gravity `-Y`, camera looking into the room from a high front edge. You can say why spinning the toy on the table is *yaw* of the **device**, why that drifts (lesson 05), and why that yaw does **not** turn the habitat camera.
 
 ## When the board arrives
 
-Confirm `forward = rotate(q, {0,0,-1})` really is “into the glass.” If the cube yaws the wrong way, negate one axis here, not in the filter.
+Confirm the authored Nest view looks 3/4 into the cube, Earth-up. If later debug overlays use `rotate(q, …)`, that is IMU visualization, not the room VP.
 
 ← [03 tasks](./03-tasks-cores-timing.md) · [next: 05 Quaternions](./05-quaternions.md) →

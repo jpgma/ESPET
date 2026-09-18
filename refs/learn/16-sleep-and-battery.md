@@ -21,7 +21,7 @@ Light-sleep **only if mixer idle**. USB Serial/JTAG dies in sleep.
 
 ## RTC SRAM
 
-Hunger, happy, sleep, last emotion (later `part_ids[6]`). Decay rates TBD with the lizard brain. The storage exists now. Deep sleep restores these; it does not restore DRAM framebuffers (GRAM may still show the last face until reset — know what your panel does).
+Hunger, happy, sleep, last emotion, **`room_id`** (later `part_ids[6]`). Decay rates TBD with the lizard brain. The storage exists now. Deep sleep restores these; it does not restore DRAM framebuffers (GRAM may still show the last face until reset — know what your panel does).
 
 `BAT_EN` uses RTC GPIO hold so it stays high while the CPU is dead.
 

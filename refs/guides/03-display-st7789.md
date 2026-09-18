@@ -56,7 +56,7 @@ Own:
 4. `CASET`/`RASET` for that window.
 5. `esp_lcd_panel_draw_bitmap` / `tx_color` **without waiting** in the same place you kick physics — wait the **previous** DMA at the start of the next dirty frame (`architecture.md` §4).
 
-GRAM-hold: if springs settled, no clip, and `|Δq|` / `|Δcam|` below deadband, **do not SPI**. The last frame stays on glass. A continuous IMU always twitches; the deadband is mandatory or you burn 30 Hz forever.
+GRAM-hold: if springs settled, no clip, toys settled, **`fx_live==0`**, **do not SPI**. The last frame stays on glass. Do **not** gate on `|Δq|` — the room camera is authored. A shake may dirty for ~0.3 s (dust FX), then hold. USB/studio may full-frame while FX live.
 
 ## Backlight
 
@@ -64,10 +64,10 @@ GPIO46, LEDC PWM. Battery default ~30–40%. USB = studio = brighter. Do not lea
 
 ## What not to do
 
-- Snap the camera to a dodecahedron vertex to “save SPI.” Sheets are discrete; the room is not.
+- IMU-orbit the room camera. Sheets are discrete yaws; the backdrop is static per room.
 - Put the RGB565 FB in PSRAM and DMA it while Wi-Fi is up (architecture already rejected this).
-- Use LVGL dirty-rect. You already have a 6-quad + 5-sprite renderer.
+- Use LVGL dirty-rect. You already have a backdrop + sprite renderer.
 
 ## Bring-up test (step 2–3)
 
-Full-screen fill red/green/blue. Print SPI microseconds at 40 vs 80 MHz. Then an indexed dummy sprite with a moving dirty rect. Confirm GRAM holds when you stop updating (cover the IMU so `|Δq|` is tiny).
+Full-screen fill red/green/blue. Print SPI microseconds at 40 vs 80 MHz. Then an indexed dummy sprite with a moving dirty rect. Confirm GRAM holds when you stop updating (tilt must **not** restart SPI).

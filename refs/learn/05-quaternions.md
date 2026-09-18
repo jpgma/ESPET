@@ -2,7 +2,7 @@
 
 ← [04 vectors](./04-vectors-matrices-camera.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 06 First pixels](./06-first-pixels.md) →
 
-**Read:** [architecture 1 (6-axis IMU)](../../architecture.md#6-axis-imu-tilt-yes-compass-no) · [guide 05](../guides/05-fusion-gravity-camera.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) (IMU-only sections; skip magnetometer)
+**Read:** [architecture 1 (6-axis IMU)](../../architecture.md#6-axis-imu-sense-always-play-sparsely) · [guide 05](../guides/05-fusion-gravity-camera.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) (IMU-only sections; skip magnetometer)
 
 A [quaternion](../glossary.md#quaternion) `q = (x, y, z, w)` (architecture uses this field order) stores a 3D rotation in four numbers with **no gimbal lock**. ESPET’s Core 0 publishes `q_device_to_world` at 100 Hz.
 
@@ -22,7 +22,7 @@ Rotate a vector `v` by `q`:
 v' = q ⊗ (0,v) ⊗ q*
 ```
 
-(`q*` = conjugate: negate x,y,z). You will write `quat_rotate(q, v)` once and use it for `forward` and `up`.
+(`q*` = conjugate: negate x,y,z). You will write `quat_rotate(q, v)` once. Debug overlays may draw `forward`/`up`; the **room camera does not**.
 
 Compose: `q_ab = q_a ⊗ q_b` (watch multiply order; pick one convention and comment it).
 
@@ -61,20 +61,13 @@ That is Mahony-style / Madgwick IMU `updateIMU`. Full recipe: [guide 05](../guid
 | Yaw around gravity | Gyro only. **Drifts.** |
 | Heading like a compass | Nobody. No [magnetometer](../glossary.md#magnetometer). |
 
-Spin the cube on the table: yaw creeps. **Recenter** (PLUS, double-tap) zeros that yaw component. Optional: decay toward “front” while `|gyro|` is tiny.
+Spin the cube on the table: filter yaw creeps. That must **not** spin the habitat camera. PLUS / double-tap are lizard one-shots later, not camera recenter.
 
-Shake: high-pass `|a|` → `jerk` → flinch. **Not** the camera.
+Shake: high-pass `|a|` → `jerk` → bounce / flinch. **Not** the camera.
 
 ## Device vs world
 
-`q_device_to_world` rotates a vector in the chip frame into world. Camera:
-
-```
-forward = rotate(q, {0,0,-1})
-up      = rotate(q, {0,1,0})
-```
-
-Confirm on glass (lesson 10 / bring-up). Sheets use `dir_local` after undoing pet yaw — the room must not spin when the pet turns.
+`q_device_to_world` rotates a vector in the chip frame into world. Use it for gravity, face-down, and `jerk`. Room `view` is authored (lesson 10). Sheets use pet yaw vs `room.front` — the room must not spin when the pet turns.
 
 ## Checkpoint
 
@@ -82,6 +75,6 @@ You can say out loud: “gravity gives me two axes; the third is dead reckoning.
 
 ## When the board arrives
 
-Plot `|q|` (should stay ~1), `|a|` at rest (~1 g), and yaw while the toy sits still (should be quiet) vs while you spin it (should move, then need recenter).
+Plot `|q|` (should stay ~1), `|a|` at rest (~1 g), and yaw while the toy sits still (should be quiet) vs while you spin it (should move and drift — that must not spin the room).
 
 ← [04 vectors](./04-vectors-matrices-camera.md) · [next: 06 First pixels](./06-first-pixels.md) →

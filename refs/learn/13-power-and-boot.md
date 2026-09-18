@@ -24,7 +24,7 @@ There is no AXP-style PMIC. You program GPIOs and an ADC.
 | `BAT_ADC` | 1 | Divider → [ADC](../glossary.md#adc) oneshot. Use the schematic ratio |
 | `CHG_STAT` | 3 | ETA6098 STAT (charge / done). USB in ≈ studio |
 | `KEY_PWR` | 5 | Long-press **latch off** (board circuit, not a charger command) |
-| PLUS | 4 | Recenter, not volume |
+| PLUS | 4 | Lizard one-shot, not volume, not camera recenter |
 | BOOT | 0 | Download strap |
 
 [ETA6098](../glossary.md#eta6098): 4.2 V Li-ion switcher, ~1 µA on BAT when idle. You do not set charge current in software.

@@ -2,7 +2,7 @@
 
 ← [08 IMU](./08-imu-registers.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 10 Cube](./10-gravity-locked-cube.md) →
 
-**Read:** [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [05 Quaternions](./05-quaternions.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) IMU chapters · [architecture 1](../../architecture.md#1-gravity-locked-cube-continuous-camera)
+**Read:** [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [05 Quaternions](./05-quaternions.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) IMU chapters · [architecture 1](../../architecture.md#1-gravity-locked-habitat-authored-camera)
 
 **Code:** `firmware/filter.c` (or similar). Input: accel (g), gyro (rad/s), `dt`. Output: unit `q_device_to_world`, `grav[]`, `jerk`. Publish into a `SharedSnap`-shaped struct even if only one thread reads it.
 
@@ -23,11 +23,11 @@ Each sample:
 4. `ω' = ω - b - kp * error`. Optional `b += ki * error * dt`; freeze `ki` when `|a|` is wild.
 5. Integrate quaternion with `ω'`, normalize.
 
-Start `kp` small (try 0.5–2). Too large: accel noise on the camera. Too small: slow to find down after a flip.
+Start `kp` small (try 0.5–2). Too large: accel noise on `q`. Too small: slow to find down after a flip.
 
-**Yaw around gravity is not in `error`.** Recenter: remove the yaw component of `q` relative to a stored “front” (PLUS later; for now a key or a debug function).
+**Yaw around gravity is not in `error`.** Filter yaw still drifts; that is fine — the room camera does not use `q`. Keep a debug recenter if you draw a horizon overlay. PLUS is not camera recenter.
 
-`jerk`: high-pass `|a|` or `|Δa|/dt`. Publish it. Do not feed it into `q`.
+`jerk`: high-pass `|a|` or `|Δa|/dt`. Publish it. Classify shake / set-down later. Do not feed it into `q`. Do not feed `q` into the room VP.
 
 ## dt
 
@@ -41,7 +41,7 @@ Print: `q` as four floats, `|q|-1` (near 0), yaw/pitch/roll for humans, `|a|`. A
 
 - Device “flat” (sim rest): quaternion stable, pitch/roll near the orientation you mapped in lesson 08.
 - Drag pitch/roll: `q` follows, settles when you stop (accel pull).
-- Drag spin (yaw): `q` yaw moves and **keeps creeping** if you add a little bias; recenter snaps it. If the sim has no drift, still implement recenter so silicon has it.
+- Drag spin (yaw): `q` yaw moves and **keeps creeping** if you add a little bias. That must not spin a room (lesson 10).
 - Shake (fast drag): `jerk` spikes; `q` does not explode if you gate `ki` / ignore accel when `|a|` is off 1 g.
 
 No cube yet. You may keep the tinted fill.

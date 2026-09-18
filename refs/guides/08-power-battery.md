@@ -29,7 +29,7 @@ IDF:
 | `BAT_ADC` | 1 | Divider. Convert with the schematic ratio (do not assume ×2). Housekeeping 1–10 Hz |
 | `CHG_STAT` | 3 | ETA6098 STAT. Charging vs done vs fault — read the charger sheet + schematic resistor. USB in ≈ studio mode |
 | `KEY_PWR` | 5 | Long-press = latch off (board circuit + GPIO). Not a charger command |
-| PLUS | 4 | Recenter. Not volume |
+| PLUS | 4 | Lizard one-shot. Not volume |
 | BOOT | 0 | Download / strap |
 
 ETA6098: precharge / CC / CV, terminate, OVP. You do not set current in software. If STAT is open-drain, use a pull-up and debounce.
@@ -59,7 +59,7 @@ USB Serial/JTAG dies in sleep. Debug on USB is studio mode.
 
 ## RTC SRAM
 
-Hunger, happy, sleep, last emotion (later `part_ids[6]`). Decay rates TBD with the lizard brain. The storage exists now.
+Hunger, happy, sleep, last emotion, `room_id` (later `part_ids[6]`). Decay rates TBD with the lizard brain. The storage exists now.
 
 ## Bring-up test (step 1 + 7)
 

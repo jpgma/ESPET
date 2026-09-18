@@ -35,7 +35,7 @@ Idle: `emotion_rest[emotion][part][3]` Q8. Gaze: `rest_head += offset` after cli
 
 Exporter samples the armature at frame *f* into rest **and** renders sheets at that pose.
 
-No walk-cycle film in v1. Locomotion = core translation + yaw.
+L0 walk-cycle film is in (blob, 4 frames × 4 yaws). This lesson is Nest **L2**: locomotion = core translation + yaw plus idle bob; no 5-part walk film.
 
 Lizard **policy** (when to wave) is TBD. Drive `clip_id` from a debug key / UART for now.
 
@@ -46,13 +46,13 @@ hitbox[i].c = world(pos[i])
 hitbox[i].r = radius[i]
 ```
 
-v1 on: core vs floor/walls/toys; limb vs toys; limb/tip vs poke ray. Off: limb vs walls; limb vs limb.
+This lesson is **S / L2** (Nest or Play): core vs floor/walls/toys; limb vs toys; limb/tip vs poke ray. Off: limb vs walls; limb vs limb. **L / L0** later: limb pairs off; screen-space pick ≥24 px; core **and toys** vs scenery AABBs. Hall eat is L0 squash + crumbs, not a Nest clip — later.
 
-Poke: unproject tap through `inv(proj*view)`, ray vs spheres, closest hit. Miss → floor ray → walk/look there. Sim: mouse click can feed UV until CST816 exists; that is a **firmware** debug path, not the sim pretending to be a pet.
+Poke (S): unproject tap through `inv(proj*view)`, ray vs spheres, closest hit. Miss → floor ray → walk/look there. Sim: mouse click can feed UV until CST816 exists; that is a **firmware** debug path, not the sim pretending to be a pet.
 
 Squish: core penetration → uniform scale on core blit, ~100 ms recover. Push squish patch on voice A if closing speed beats threshold.
 
-Flinch: `jerk` impulse on core+head `vel`. Core 0 also pokes yelp on voice B (mixer later).
+Flinch / shake: `jerk` / `imu_evt` impulse on core+head `vel` (and toys). Core 0 also pokes yelp on voice B (mixer later). Always simulate six masses, even when you later blit L0.
 
 ## `SfxEvt`
 
@@ -66,11 +66,11 @@ No dual-core, no real mixer. Still: seqlock-shaped snapshot, `g_sfx[]` ring, Cor
 
 ## Checkpoint (sim)
 
-Idle blob on springs. Fire debug `clip_id` = wave: rest hand rises, mass lags, sheet frame matches the clip. Sphere debug draw. Fake poke hits a sphere, not a pixel. Collide with a toy/floor logs `SfxEvt` with cooldown. Room still gravity-locked.
+Idle L2 part on springs. Fire debug `clip_id` = wave: rest hand rises, mass lags, sheet frame matches the clip. Sphere debug draw. Fake poke hits a sphere, not a pixel. Collide with a toy/floor logs `SfxEvt` with cooldown. Room still gravity-locked and **does not orbit**.
 
 ## When the board arrives
 
-Architecture §15 step 6: six springs + idle rest. Sphere poke. Toys. Touch wiring is lesson 14; you can poke with PLUS or a debug UART until then.
+Architecture §15 step 6: six springs + idle rest. Sphere poke (S). Play toys. Touch wiring is lesson 14; you can poke with a debug UART until then. PLUS is a lizard one-shot, not camera recenter.
 
 Do not implement lizard personality.
 

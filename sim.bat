@@ -46,6 +46,7 @@ echo   sim.bat --debug         Debug instead of Release
 echo   sim.bat --no-run        build only
 echo   sim.bat --run-only      skip build; start the last exe
 echo   sim.bat --help          this text
+echo   debug.bat               open the solution in Visual Studio ^(F5^)
 echo.
 echo Optional env: set BOARD_SIM_SPI_HZ=40000000
 echo   (fake SPI duration on draw_bitmap; unset = off)
