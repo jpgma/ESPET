@@ -19,7 +19,7 @@ When IDF boots, it calls `app_main`. In [firmware/main.c](../../firmware/main.c)
 | Core | What |
 | :--- | :--- |
 | **0** | [IMU](../glossary.md#imu) 100 Hz, touch [IRQ](../glossary.md#irq), lizard 20 Hz, mixer, backlight, optional Wi-Fi |
-| **1** | One pinned task: snapshot → IMU evt → springs → yaw sheet → dirty SPI → wait for 33.3 ms |
+| **1** | One pinned task: snapshot → IMU evt → springs → RBs → raster meshes → dirty SPI → wait for 33.3 ms |
 
 **Golden rule 1:** Core 1 never waits on Core 0, Wi-Fi, or the LLM.
 
@@ -43,9 +43,9 @@ That is “deferred work.” Polling the IMU every 33 ms (current `main.c`) is a
 
 | Slice | Time |
 | :--- | :--- |
-| Clip + springs + yaw `view_idx` | &lt; 0.8 ms |
+| Clip + springs + RBs + yaw `view_idx` | &lt; 0.8 ms |
 | Backdrop restore | small (S) / trivial (L) |
-| Blits | 0.3–2 ms |
+| Mesh raster + stamps | 0.3–2.5 ms |
 | SPI DMA | ~7–12 ms S dirty; ~1–3 ms L; full frame on door |
 | Slack | [WFI](../glossary.md#wfi) |
 

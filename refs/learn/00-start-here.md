@@ -4,14 +4,17 @@
 
 You are going to program a tiny computer that lives on a cube-shaped toy: the [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). The product is described in [architecture.md](../../architecture.md). This course assumes you have written programs before, but **not** firmware, **not** C, and **not** 3D math.
 
+**Board literacy** (pins, schematic, ST7789, QMI8658, `BAT_EN`) lives in **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). This course is the habitat.
+
 In Cursor, **Ctrl+click** a link in the markdown source, or open **Markdown: Open Preview to the Side** (`Ctrl+Shift+V`). The Preview/Markdown toggle in the tab does not open local files (it looks under `C:\` and reports them missing).
 
 ## Two kinds of docs
 
 | Folder | Who it is for |
 | :--- | :--- |
-| [learn/](./00-start-here.md) (this course) | You. Concepts, vocabulary, code you write, checkpoints. |
-| [guides/](../guides/01-board-and-pins.md) | Future you. Blunt “which PDF page, which register.” No teaching. |
+| [learn/](./00-start-here.md) (this course) | You. Habitat concepts, code you write, checkpoints. |
+| [jpgma/esp32-s3](https://github.com/jpgma/esp32-s3) | Silicon. Which PDF page, which register. |
+| [guides/05](../guides/05-fusion-gravity-camera.md) and [09](../guides/09-bring-up.md) | Product tests on that silicon. |
 
 When a lesson says **Read**, open those files. Do not try to read a datasheet cover to cover.
 
@@ -32,13 +35,13 @@ The window is a fake 240×240 panel. Dragging it tilts a fake [IMU](../glossary.
 
 ## Sim vs real board
 
-Lessons **01–12** run in `board-sim` today. Lessons **13–16** you *read now* and *do on silicon* when the Waveshare arrives. Every build lesson still has a **When the board arrives** box so you do not rewrite the course later.
+Lessons **01, 03–05, 07, 09–12** run in ESPET `board-sim` today. Board bring-up (power, pixels, IMU registers, touch, audio, sleep) is the other repo; read those now, do them on silicon when the Waveshare arrives. Every remaining build lesson still has a **When the board arrives** box so you do not rewrite the course later.
 
 Known sim gaps (write the code the architecture way anyway):
 
 - One thread, not two [cores](../glossary.md#core).
 - No [CST816](../glossary.md#cst816), [ES8311](../glossary.md#es8311), or `BAT_EN`.
-- IMU is polled; a real [FIFO](../glossary.md#fifo) + [IRQ](../glossary.md#irq) comes on hardware (lesson 08 / 13).
+- IMU is polled; a real [FIFO](../glossary.md#fifo) + [IRQ](../glossary.md#irq) comes on hardware.
 
 Growing the simulator is a separate job. Do not stall a lesson waiting for it.
 
@@ -47,30 +50,28 @@ Growing the simulator is a separate job. Do not stall a lesson waiting for it.
 Fundamentals
 
 - [ ] [01 C for firmware](./01-c-for-firmware.md)
-- [ ] [02 How chips talk](./02-how-chips-talk.md)
+- [ ] Buses, pins, ST7789, QMI8658 — [esp32-s3 learn](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/learn/README.md) ([stub 02](./02-how-chips-talk.md))
 - [ ] [03 Tasks, cores, timing](./03-tasks-cores-timing.md)
 - [ ] [04 Vectors, matrices, camera](./04-vectors-matrices-camera.md)
 - [ ] [05 Quaternions](./05-quaternions.md)
 
 Build in sim
 
-- [ ] [06 First pixels](./06-first-pixels.md)
+- [ ] First pixels — [esp32-s3](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/learn/first-pixels.md) ([stub 06](./06-first-pixels.md))
 - [ ] [07 Indexed framebuffer and dirty rect](./07-indexed-framebuffer.md)
-- [ ] [08 IMU registers](./08-imu-registers.md)
+- [ ] IMU registers — [esp32-s3](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/learn/imu-registers.md) ([stub 08](./08-imu-registers.md))
 - [ ] [09 Complementary filter](./09-complementary-filter.md)
 - [ ] [10 Gravity-locked cube](./10-gravity-locked-cube.md) (authored room; IMU bounce, not orbit)
-- [ ] [11 Sheets and sprites](./11-sheets-and-sprites.md)
+- [ ] [11 Rigid meshes](./11-sheets-and-sprites.md)
 - [ ] [12 Clips, springs, hitboxes](./12-clips-springs-hitboxes.md)
 
 Real board (read now)
 
-- [ ] [13 Power and boot](./13-power-and-boot.md)
-- [ ] [14 Touch](./14-touch.md)
-- [ ] [15 Audio](./15-audio.md)
-- [ ] [16 Sleep and battery](./16-sleep-and-battery.md)
+- [ ] Power and boot — [esp32-s3](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/learn/power-and-boot.md) ([stub 13](./13-power-and-boot.md))
+- [ ] Touch / audio / sleep silicon — [esp32-s3 guides](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/09-bring-up.md); product tests [guide 09](../guides/09-bring-up.md) ([stubs 14](./14-touch.md) [15](./15-audio.md) [16](./16-sleep-and-battery.md))
 
 ## If you get lost
 
 Product in one paragraph: [architecture 0](../../architecture.md#0-product-lock).  
-Pins: [cheat sheet](./cheatsheet.md).  
+Pins: [cheat sheet](./cheatsheet.md) and [HARDWARE.md](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md).  
 Bring-up order on silicon: [guide 09](../guides/09-bring-up.md).

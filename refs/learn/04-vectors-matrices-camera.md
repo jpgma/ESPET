@@ -12,8 +12,8 @@ A 3D [vector](../glossary.md#vector) is `(x, y, z)`.
 
 - **Length:** `|v| = sqrt(x²+y²+z²)`.
 - **[Normalize](../glossary.md#normalize):** `v / |v|` → length 1. Directions only.
-- **[Dot](../glossary.md#dot-product):** `a·b = axbx+ayby+azbz`. Positive = same hemisphere. `yaw_quad` picks a sheet from four headings this way.
-- **[Cross](../glossary.md#cross-product):** `a×b` is perpendicular to both. You need it for `look_at` (camera axes) and for the IMU error `a × predicted_down`.
+- **[Dot](../glossary.md#dot-product):** `a·b = axbx+ayby+azbz`. Positive = same hemisphere. `yaw_quad` picks a **painter's draw-order** slot from four headings this way — not a photo. N·L uses the same helper at triangle setup.
+- **[Cross](../glossary.md#cross-product):** `a×b` is perpendicular to both. You need it for `look_at` (camera axes), limb **aim**, and the IMU error `a × predicted_down`.
 
 Write four helpers you will keep: `vec3_add`, `vec3_scale`, `vec3_dot`, `vec3_cross`, `vec3_norm`. Put them in something like `firmware/math3.c` when you start lesson 10, or a notebook until then.
 
@@ -28,7 +28,7 @@ Same point, different numbers:
 | **Device** | The physical chip/screen. IMU measures here. |
 | **Room** | Authored 3/4 camera. `front` is a yaw around world +Y. |
 
-Architecture: simulate in body space. One 3×4 (translate + yaw) maps body → world for projection and core-vs-room collision. The screen camera is **not** the device frame.
+Architecture: simulate in body space. One 3×4 (translate + yaw) maps body → world for projection, core-vs-room collision, and **mesh transforms**. The screen camera is **not** the device frame.
 
 **Tilt does not change world gravity.** Springs always use world `-Y` mapped into body. The pet does not lean with the glass. The window does not orbit.
 
@@ -36,15 +36,16 @@ Architecture: simulate in body space. One 3×4 (translate + yaw) maps body → w
 
 A 3×3 [rotation](../glossary.md#rotation-matrix) `R` turns a vector: `v' = R v`. A 4×4 [view](../glossary.md#view-matrix) / [projection](../glossary.md#projection-matrix) is the usual graphics stack.
 
-You do not need a linear-algebra library. 4×4 multiply and invert-of-rigid-transform (transpose rotation, undo translation) are enough.
+You do not need a linear-algebra library. 4×4 multiply and invert-of-rigid-transform (transpose rotation, undo translation) are enough. A rigid part mesh is one extra 3×4: translate to `world(pos[i])`, aim bind +Y along attach → `pos`/`tip`. That is **not** skinning.
 
 ## `look_at`
 
 [architecture §1](../../architecture.md#1-gravity-locked-habitat-authored-camera):
 
 ```
-view = room.view     // authored 3/4; elev ~40°; azimuth = room.front
-proj = room.proj     // perspective ~55°, aspect 1.0
+view      = room.view     // authored 3/4; elev ~40°; azimuth = room.front
+proj      = room.proj     // perspective ~55°, aspect 1.0
+light_dir = room.light_dir
 ```
 
 You still write `look_at` so a room record can store eye / target / up instead of a baked matrix.
@@ -66,17 +67,17 @@ You still write `look_at` so a room record can store eye / target / up instead o
 
 After `clip = proj * view * world_point`, [perspective divide](../glossary.md#perspective-divide): `ndc = clip.xyz / clip.w`. Then map `-1…1` to pixels `0…239`.
 
-`project(pos)` for a part pivot = that pipeline. The sprite hangs from that hotspot. The posed silhouette is **in the pixels**, not a second transform.
+`project(pos)` for a part origin = that pipeline. The **mesh** is transformed by the part 3×4, then each triangle is clipped and filled. There is no posed silhouette sitting in a sprite.
 
 ## AABB
 
-An [AABB](../glossary.md#aabb) is a screen-space box: min/max x, y. Dirty rect = union of projected moving AABBs + margin. That window is what you send over SPI.
+An [AABB](../glossary.md#aabb) is a screen-space box: min/max x, y. Dirty rect = union of projected moving AABBs + margin. That window is what you send over SPI — and what the rasterizer fills.
 
-## Yaw sheets
+## Yaw draw-order (not sheets)
 
-Four headings in XZ: front, right, back, left, relative to `room.front`. `view_idx = yaw_quad(pet_yaw - room.front)` with [hysteresis](../glossary.md#hysteresis). The camera does not move when the pet turns; the **photo** does.
+Four headings in XZ: front, right, back, left, relative to `room.front`. `view_idx = yaw_quad(pet_yaw - room.front)` with [hysteresis](../glossary.md#hysteresis). The camera does not move when the pet turns; the **mesh rotates continuously**. `view_idx` only indexes baked `draw_order[4]` so painter's algorithm does not chatter.
 
-FOV ~55°, same in Blender as runtime. S bake: pet ~1/3 of the frame. L bake: pet ~24–32 px.
+FOV ~55°, same in Blender as runtime. S rooms: pet ~1/3 of the frame. L rooms: pet ~24–32 px (a smaller authored mesh, not a live downsample).
 
 ## Checkpoint
 

@@ -1,18 +1,18 @@
 # 10 — Gravity-locked cube
 
-← [09 filter](./09-complementary-filter.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 11 Sheets](./11-sheets-and-sprites.md) →
+← [09 filter](./09-complementary-filter.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 11 Meshes](./11-sheets-and-sprites.md) →
 
 **Read:** [architecture 1](../../architecture.md#1-gravity-locked-habitat-authored-camera) · [architecture 10 Room](../../architecture.md#10-rendering) · [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [04](./04-vectors-matrices-camera.md)
 
 **Code:** room in `firmware/` (e.g. `room.c`). **No pet.** Authored Nest-sized 3/4 camera, indexed backdrop (or six quads rastered **once** into a 240×240 buffer), dirty rect from lesson 07.
 
-This is the product test. If the room **orbits** when you tilt the board, stop — the camera must not come from IMU `q`. The cube stays glued to Earth. Do not start sprites.
+This is the product test. If the room **orbits** when you tilt the board, stop — the camera must not come from IMU `q`. The cube stays glued to Earth. Do not start pet meshes.
 
 ## World
 
 Cube glued to Earth. Floor XZ, `+Y` up. Pet would stand on `Y=0` later. You show floor, walls, optional ceiling from a high **front** edge.
 
-Programmer art: fill a 240×240 indexed [backdrop](../glossary.md#backdrop) with a checker floor and three walls. Same 32-colour [palette](../glossary.md#palette) for this lesson (one table; per-room palettes come with Hall). Keep it in a buffer you will later put in PSRAM; for sim, DRAM is fine.
+Programmer art: fill a 240×240 indexed [backdrop](../glossary.md#backdrop) with a checker floor and three walls. Same 32-colour [palette](../glossary.md#palette) for this lesson (one table; per-room palettes and actor **ramps** come with Hall). Keep it in a buffer you will later put in PSRAM; for sim, DRAM is fine.
 
 ## Camera once per room
 
@@ -30,20 +30,20 @@ Bake or hard-code one Nest S view. Do not recompute from snapshot `q` every fram
 
 IMU still runs (lesson 09). Use `jerk` later for bounce. Use `q` for face-down / debug horizon only.
 
-## Raster
+## Raster (the room, once)
 
 Either:
 
 - blit the precomposed backdrop into the indexed FB, or
 - fill six quads **once** into that backdrop, then treat it as a bitmap.
 
-This is not a GPU. Do not re-raster the room from a moving VP.
+This is not a GPU. **Do not re-raster the backdrop from a moving VP.** Live triangles in lesson 11 are for *movers* (pet, toys), not for the room photograph.
 
 Dirty rect: whole 240×240 until something moves. Goal: when idle, skip SPI. Tilt must **not** dirty the room.
 
 ## Deadband (idle SPI)
 
-Skip frame if nothing in the habitat moved (no clip, springs settled — none yet). **Do not** test `|Δq|` / `|Δcam|`. The window is authored. Later GRAM-hold also waits for toys settled and [`fx_live==0`](../glossary.md#fx) ([architecture](../../architecture.md#4-core-allocation)).
+Skip frame if nothing in the habitat moved (no clip, springs settled — none yet). **Do not** test `|Δq|` / `|Δcam|`. The window is authored. Later GRAM-hold also waits for toys/knockables **sleeping** and [`fx_live==0`](../glossary.md#fx) ([architecture](../../architecture.md#4-core-allocation)).
 
 Log skipped vs drawn. If you draw 30 Hz while the board sits still, you are sampling IMU into the camera.
 
@@ -56,6 +56,7 @@ If `jerk` is above a threshold, log `imu_evt = shake` and optionally bounce a de
 - Build `view` from `rotate(q, …)`.
 - Rotate the room with device roll as if the cube were glued to the phone. World up stays world up.
 - Snap anything to a dodecahedron. That index is gone.
+- Re-raster the six room quads every frame from IMU.
 
 ## Checkpoint (sim)
 
@@ -65,4 +66,4 @@ Drag pitch/roll: the **picture stays put**. The cube does not lean. Shake (fast 
 
 Architecture §15 step 4: complementary filter → gravity / `jerk`. Authored Nest backdrop. Hold the board: tilt does not orbit; a shake hops a debug mass.
 
-← [09 filter](./09-complementary-filter.md) · [next: 11 Sheets](./11-sheets-and-sprites.md) →
+← [09 filter](./09-complementary-filter.md) · [next: 11 Meshes](./11-sheets-and-sprites.md) →

@@ -2,7 +2,7 @@
 
 ← [04 vectors](./04-vectors-matrices-camera.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 06 First pixels](./06-first-pixels.md) →
 
-**Read:** [architecture 1 (6-axis IMU)](../../architecture.md#6-axis-imu-sense-always-play-sparsely) · [guide 05](../guides/05-fusion-gravity-camera.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) (IMU-only sections; skip magnetometer)
+**Read:** [architecture 1 (6-axis IMU)](../../architecture.md#6-axis-imu-sense-always-play-sparsely) · [guide 05](../guides/05-fusion-gravity-camera.md) · [madgwick_icorr2011.pdf](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/refs/fusion/madgwick_icorr2011.pdf) (IMU-only sections; skip magnetometer)
 
 A [quaternion](../glossary.md#quaternion) `q = (x, y, z, w)` (architecture uses this field order) stores a 3D rotation in four numbers with **no gimbal lock**. ESPET’s Core 0 publishes `q_device_to_world` at 100 Hz.
 

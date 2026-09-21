@@ -1,14 +1,12 @@
 # 05 — Fusion, gravity, and IMU events
 
-**Goal:** a unit quaternion `q_device_to_world` at 100 Hz such that world +Y is opposite gravity, plus `jerk` / sparse `imu_evt` for bounce. The **screen camera is not this quaternion.** `view_idx` is pet yaw vs `room.front` (0..3).
+**Goal:** a unit quaternion `q_device_to_world` at 100 Hz such that world +Y is opposite gravity, plus `jerk` / sparse `imu_evt` for bounce. The **screen camera is not this quaternion.** `view_idx` is pet yaw vs `room.front` (0..3) for **painter's order** only.
 
 This is not a chip. It is the IMU’s software. Architecture §1 is the spec.
 
 ## Local paper
 
-| File | Read |
-| :--- | :--- |
-| [`../fusion/madgwick_icorr2011.pdf`](../fusion/madgwick_icorr2011.pdf) | Sections on **IMU** (accel+gyro only), quaternion kinematics, gradient correction from gravity. Ignore MARG / magnetometer chapters |
+Generic 6-axis recipe (no habitat camera): [esp32-s3 guide 05](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/05-6axis-filter.md). Paper: [madgwick_icorr2011.pdf](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/refs/fusion/madgwick_icorr2011.pdf) (IMU chapters only; ignore MARG / magnetometer).
 
 Mahony TAC 2008 (explicit complementary filter on SO(3), gyro bias) is the other classic. It is IEEE-paywalled; DOI [10.1109/TAC.2008.923738](https://doi.org/10.1109/TAC.2008.923738). You do **not** need it to ship v1. Madgwick IMU + the recipe below is enough.
 
@@ -50,9 +48,9 @@ view_idx = yaw_quad(pet_yaw - room.front)   // 0..3, hysteresis
 lod      = room.lod                  // L0 or L2
 ```
 
-The window **stays**. The photos **pop** when the pet turns. If pop is harsh: hysteresis, then maybe blend two yaws. Never IMU-orbit `cam_pos`.
+The window **stays**. The **mesh rotates** when the pet turns. `view_idx` may tick for draw-order. Never IMU-orbit `cam_pos`. Paper-turn / two-sheet blend are gone.
 
-Idle SPI: springs settled, no clip, toys settled, `fx_live==0`. **No** `|Δq|` / `|Δcam|` test.
+Idle SPI: springs settled, no clip, toys/knockables sleeping, `fx_live==0`. **No** `|Δq|` / `|Δcam|` test.
 
 ## Open question (architecture §18)
 
@@ -60,4 +58,4 @@ Orthonormalize IMU `up` against world +Y only if you draw a **debug** horizon. T
 
 ## Bring-up test (step 4 product test)
 
-Authored Nest backdrop, **no pet** required. Tilt the board: the picture stays put, Earth-up. Shake: a debug mass hops, cooldown, then GRAM-hold. Spin on the table: filter yaw creeps; the room does not. This test is the product. Do not start sprites until tilt-does-not-orbit is true.
+Authored Nest backdrop, **no pet** required. Tilt the board: the picture stays put, Earth-up. Shake: a debug mass hops, cooldown, then GRAM-hold. Spin on the table: filter yaw creeps; the room does not. This test is the product. Do not start pet meshes until tilt-does-not-orbit is true.

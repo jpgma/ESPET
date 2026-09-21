@@ -8,7 +8,7 @@
 
 ## Why indexed-8
 
-A 240×240 RGB565 frame is 115200 bytes. Two of them plus Wi-Fi DMA in internal RAM does not fit the product. Indexed-8 is 57600 bytes per buffer. Colour 0 = [key](../glossary.md#color-key) (transparent in sprites). Palette has 32 real colours; a 256-slot table is still fine if slot 32…255 unused. **Per-room palettes** (1–15 actors / 16–31 scenery) arrive with Hall; this lesson is one table.
+A 240×240 RGB565 frame is 115200 bytes. Two of them plus Wi-Fi DMA in internal RAM does not fit the product. Indexed-8 is 57600 bytes per buffer. Colour 0 = [key](../glossary.md#color-key) (transparent in sprites). Palette has 32 real colours; a 256-slot table is still fine if slot 32…255 unused. **Per-room palettes** (1–15 actor **ramps** / 16–31 scenery) arrive with Hall; this lesson is one table.
 
 **Scanout:** indexed back buffer → expand dirty rows to RGB565 bounce → [GDMA](../glossary.md#gdma) to ST7789.
 

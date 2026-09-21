@@ -1,6 +1,6 @@
 # 12 — Clips, springs, hitboxes
 
-← [11 sheets](./11-sheets-and-sprites.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 13 Power](./13-power-and-boot.md) →
+← [11 meshes](./11-sheets-and-sprites.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 13 Power](./13-power-and-boot.md) →
 
 **Read:** [architecture 6](../../architecture.md#6-runtime-representation-not-a-skeleton) · [architecture 7](../../architecture.md#7-clips-animation-writes-rest-not-pos) · [architecture 8](../../architecture.md#8-physics-and-hitboxes) · golden rules 5–8
 
@@ -10,12 +10,12 @@
 
 ```
 clip.sample(t) → rest[] → spring → pos[] → hitbox
-                              └→ project(pos) + sheet(view, clip, frame)
+                              └→ aim(mesh) + raster(lod, light)
 ```
 
-A [clip](../glossary.md#clip) is a short animation: keyframed rest poses (and matching sheets), not a film of the whole pet. Clips write **rest**, not `pos`. Animation and the matching sheet frame are the **same pose**. Springs only lag.
+A [clip](../glossary.md#clip) is a short animation: keyframed rest poses, not a film of the whole pet and not posed meshes. Clips write **rest**, not `pos`. Meshes are **bind-pose**. Springs only lag.
 
-Pixels are not physics. [Hitboxes](../glossary.md#hitbox) are spheres on `pos` (and optional `tip`). Never sprite alpha.
+Pixels are not physics. [Hitboxes](../glossary.md#hitbox) are spheres on `pos` (and optional `tip`). Never sprite alpha. Never mesh triangles.
 
 ## `Bodies`
 
@@ -29,13 +29,15 @@ While a clip is active, **raise `k`** on masked parts so the hand actually rises
 
 Idle: `emotion_rest[emotion][part][3]` Q8. Gaze: `rest_head += offset` after clip sample. Additive.
 
+L2 mesh aim: translate to `world(pos[i])`, aim bind +Y along attach → `pos`/`tip`. That is a rigid 3×4, not skinning.
+
 ## Clips
 
 `ClipHdr`: id, part_mask, frame_count, fps (~15), duration, `vox_id` (0 = silent). Packed `int16` rest tracks. Playback: lerp two keys, Q8 → float, write `rest[p]`. Missing mask bits keep last emotion rest.
 
-Exporter samples the armature at frame *f* into rest **and** renders sheets at that pose.
+Exporter samples the armature at frame *f* into rest. **Do not** export a mesh per clip frame. The raised arm is the idle arm mesh aimed at a risen mass.
 
-L0 walk-cycle film is in (blob, 4 frames × 4 yaws). This lesson is Nest **L2**: locomotion = core translation + yaw plus idle bob; no 5-part walk film.
+L0 walk-cycle film is **out**. Walk is core translation + yaw plus idle rest bob on the combined mesh. This lesson is Nest **L2**: locomotion = core translation + yaw plus idle bob; no 6-part walk film.
 
 Lizard **policy** (when to wave) is TBD. Drive `clip_id` from a debug key / UART for now.
 
@@ -46,13 +48,13 @@ hitbox[i].c = world(pos[i])
 hitbox[i].r = radius[i]
 ```
 
-This lesson is **S / L2** (Nest or Play): core vs floor/walls/toys; limb vs toys; limb/tip vs poke ray. Off: limb vs walls; limb vs limb. **L / L0** later: limb pairs off; screen-space pick ≥24 px; core **and toys** vs scenery AABBs. Hall eat is L0 squash + crumbs, not a Nest clip — later.
+This lesson is **S / L2** (Nest or Play): core vs floor/walls/toys; limb vs toys; limb/tip vs poke ray. Off: limb vs walls; limb vs limb. **L / L0** later: limb pairs off; screen-space pick ≥24 px; core **and toys** vs scenery AABBs. Hall eat is L0 squash + crumbs, not a Nest clip — later. Toy [rigid bodies](../glossary.md#rigid-body) and knockable props land in the same collide step; Nest has **no** knockables.
 
 Poke (S): unproject tap through `inv(proj*view)`, ray vs spheres, closest hit. Miss → floor ray → walk/look there. Sim: mouse click can feed UV until CST816 exists; that is a **firmware** debug path, not the sim pretending to be a pet.
 
-Squish: core penetration → uniform scale on core blit, ~100 ms recover. Push squish patch on voice A if closing speed beats threshold.
+Squish: core penetration → non-uniform scale on the core mesh, ~100 ms recover. Push squish patch on voice A if closing speed beats threshold.
 
-Flinch / shake: `jerk` / `imu_evt` impulse on core+head `vel` (and toys). Core 0 also pokes yelp on voice B (mixer later). Always simulate six masses, even when you later blit L0.
+Flinch / shake: `jerk` / `imu_evt` impulse on core+head `vel` (and toys / knockables). Core 0 also pokes yelp on voice B (mixer later). Always simulate six masses, even when you later draw L0.
 
 ## `SfxEvt`
 
@@ -66,12 +68,12 @@ No dual-core, no real mixer. Still: seqlock-shaped snapshot, `g_sfx[]` ring, Cor
 
 ## Checkpoint (sim)
 
-Idle L2 part on springs. Fire debug `clip_id` = wave: rest hand rises, mass lags, sheet frame matches the clip. Sphere debug draw. Fake poke hits a sphere, not a pixel. Collide with a toy/floor logs `SfxEvt` with cooldown. Room still gravity-locked and **does not orbit**.
+Idle L2 part on springs. Fire debug `clip_id` = wave: rest hand rises, mass lags, bind-pose mesh **aims** at the mass. Sphere debug draw. Fake poke hits a sphere, not a pixel. Collide with a toy/floor logs `SfxEvt` with cooldown. Room still gravity-locked and **does not orbit**.
 
 ## When the board arrives
 
-Architecture §15 step 6: six springs + idle rest. Sphere poke (S). Play toys. Touch wiring is lesson 14; you can poke with a debug UART until then. PLUS is a lizard one-shot, not camera recenter.
+Architecture §15 step 6: six springs + idle rest. Sphere poke (S). Play toy RBs. Touch wiring is lesson 14; you can poke with a debug UART until then. PLUS is a lizard one-shot, not camera recenter.
 
 Do not implement lizard personality.
 
-← [11 sheets](./11-sheets-and-sprites.md) · [next: 13 Power](./13-power-and-boot.md) →
+← [11 meshes](./11-sheets-and-sprites.md) · [next: 13 Power](./13-power-and-boot.md) →

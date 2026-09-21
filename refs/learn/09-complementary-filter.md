@@ -2,7 +2,7 @@
 
 ← [08 IMU](./08-imu-registers.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 10 Cube](./10-gravity-locked-cube.md) →
 
-**Read:** [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [05 Quaternions](./05-quaternions.md) · [madgwick_icorr2011.pdf](../fusion/madgwick_icorr2011.pdf) IMU chapters · [architecture 1](../../architecture.md#1-gravity-locked-habitat-authored-camera)
+**Read:** [guide 05](../guides/05-fusion-gravity-camera.md) · lesson [05 Quaternions](./05-quaternions.md) · [madgwick_icorr2011.pdf](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/refs/fusion/madgwick_icorr2011.pdf) IMU chapters · [architecture 1](../../architecture.md#1-gravity-locked-habitat-authored-camera)
 
 **Code:** `firmware/filter.c` (or similar). Input: accel (g), gyro (rad/s), `dt`. Output: unit `q_device_to_world`, `grav[]`, `jerk`. Publish into a `SharedSnap`-shaped struct even if only one thread reads it.
 

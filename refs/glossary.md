@@ -2,6 +2,8 @@
 
 Plain-language terms for the [learn course](./learn/00-start-here.md). **In ESPET** is how *this* toy uses the word.
 
+Board pins, chips, and datasheets: **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154/docs/glossary.md`](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/glossary.md). Lessons 02 / 06 / 08 / 13–16 in this folder are stubs that point there.
+
 Jump: [C and memory](#c-and-memory) · [Buses and hardware](#buses-and-hardware) · [RTOS](#rtos-and-concurrency) · [Graphics](#graphics) · [IMU and math](#imu-and-math) · [Audio](#audio) · [Power](#power) · [Toolchain](#esp-idf-and-toolchain)
 
 Course: [learn/00](./learn/00-start-here.md) · [cheat sheet](./learn/cheatsheet.md)
@@ -20,11 +22,11 @@ A small DRAM array you fill just before DMA, instead of pointing DMA at a huge o
 
 ### Const
 A promise you will not write this object. The compiler may put it in flash.
-**In ESPET:** cold tables (4 yaw headings, clip headers, room records) can be `const` for XIP. See [lesson 01](./learn/01-c-for-firmware.md).
+**In ESPET:** cold tables (4 yaw headings for draw-order, clip headers, room records, meshes) can be `const` for XIP. See [lesson 01](./learn/01-c-for-firmware.md).
 
 ### DRAM
 Internal SRAM the CPU and most DMA can use without the PSRAM cache dance.
-**In ESPET:** framebuffers, mixer, seqlock, blit inner loop. See [guide 02](./guides/02-soc-memory-smp.md).
+**In ESPET:** framebuffers, mixer, seqlock, raster/blit inner loop. See [guide 02](./guides/02-soc-memory-smp.md).
 
 ### DRAM_ATTR
 IDF attribute that forces a symbol into internal DRAM.
@@ -36,7 +38,7 @@ Byte order of a multi-byte number. Little-endian = least significant byte first.
 
 ### Flash
 Non-volatile NOR memory the chip boots from. Slow to erase; can execute in place (XIP).
-**In ESPET:** 16 MB W25Q128, quad, 80 MHz. Firmware, atlas, clips. No PCM in v1. See [lesson 13](./learn/13-power-and-boot.md).
+**In ESPET:** 16 MB W25Q128, quad, 80 MHz. Firmware, meshes, stamps, clips. No PCM in v1. See [lesson 13](./learn/13-power-and-boot.md).
 
 ### Heap
 Memory `malloc` hands out at runtime. Can fragment.
@@ -44,7 +46,7 @@ Memory `malloc` hands out at runtime. Can fragment.
 
 ### Hot path
 Code that runs every sample or every frame.
-**In ESPET:** Core 1 loop and the mixer. No STL, no flash reads for audio, no PSRAM in the blit. See [architecture 0](../architecture.md#0-product-lock).
+**In ESPET:** Core 1 loop and the mixer. No STL, no flash reads for audio, no PSRAM in the raster. See [architecture 0](../architecture.md#0-product-lock).
 
 ### int16_t
 Exactly 16-bit signed integer (−32768…32767).
@@ -56,7 +58,7 @@ Least significant bit, or “counts per unit” in a sensor (LSB/g).
 
 ### Pointer
 An address of another object in memory.
-**In ESPET:** `draw_bitmap` takes a pointer to pixels; do not pass a PSRAM atlas into DMA casually. See [lesson 01](./learn/01-c-for-firmware.md).
+**In ESPET:** `draw_bitmap` takes a pointer to pixels; do not pass a PSRAM buffer into DMA casually. See [lesson 01](./learn/01-c-for-firmware.md).
 
 ### POD
 Plain Old Data: a struct of C types with no hidden constructors.
@@ -64,7 +66,7 @@ Plain Old Data: a struct of C types with no hidden constructors.
 
 ### PSRAM
 Extra RAM outside the CPU die, reached through a cache (here 8 MB octal in-package).
-**In ESPET:** resident room backdrop (57.6 KB), optional next-room prefetch, atlas if XIP thrashes. Never FB, mixer, or Wi-Fi DMA. See [guide 02](./guides/02-soc-memory-smp.md).
+**In ESPET:** resident room backdrop (57.6 KB), optional next-room prefetch, stamps if XIP thrashes. Never FB, mixer, or Wi-Fi DMA. Meshes stay XIP (tiny). See [guide 02](./guides/02-soc-memory-smp.md).
 
 ### Q8
 Fixed-point format: stored_integer / 256 = real value.
@@ -100,7 +102,7 @@ Tells the compiler “this may change behind your back.” Not a CPU memory barr
 
 ### XIP
 Execute / read in place from flash via the cache.
-**In ESPET:** cold tables. If the atlas thrashes the cache, move pixels to PSRAM. See [guide 02](./guides/02-soc-memory-smp.md).
+**In ESPET:** cold tables and meshes. If stamps thrash the cache, move those pixels to PSRAM. See [guide 02](./guides/02-soc-memory-smp.md).
 
 ---
 
@@ -236,7 +238,7 @@ I2C data.
 
 ### Schematic
 The wiring diagram of the board.
-**In ESPET:** law after one pass. [`ESP32-S3-LCD-1.54-Schematic.pdf`](./ESP32-S3-LCD-1.54-Schematic.pdf). See [lesson 02](./learn/02-how-chips-talk.md).
+**In ESPET:** law after one pass. Schematic lives in [jpgma/esp32-s3](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/refs/ESP32-S3-LCD-1.54-Schematic.pdf). See [lesson 02](./learn/02-how-chips-talk.md).
 
 ### SoC
 System on chip: CPU + RAM + radios + peripherals in one package.
@@ -356,23 +358,23 @@ The CPU architecture (LX7 here).
 
 ### AABB
 Axis-aligned bounding box (min/max x,y, no rotation).
-**In ESPET:** dirty rect = union of projected part AABBs + margin. See [lesson 07](./learn/07-indexed-framebuffer.md).
+**In ESPET:** dirty rect = union of projected mesh/stamp AABBs + margin. See [lesson 07](./learn/07-indexed-framebuffer.md).
 
 ### Atlas
-One (or few) big images packing many sprites.
-**In ESPET:** indexed-8, same **index contract** as the FB (0 = key; 1–15 actors; 16–31 scenery). Per-room RGB565 table. See [lesson 11](./learn/11-sheets-and-sprites.md).
+A packed image of stamps (shadow, FX). Not the pet.
+**In ESPET:** indexed-8 stamps only. Pet is meshes. Same **index contract** as the FB (0 = key; 1–15 actor ramps; 16–31 scenery). Per-room RGB565 table. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### Backdrop
 A full-screen indexed image of a room (floor + walls), copied into the FB as background.
-**In ESPET:** 240×240, resident in PSRAM; dirty window restore then sprites. Room’s `palette[32]` loads with it. See [lesson 10](./learn/10-gravity-locked-cube.md).
+**In ESPET:** 240×240, resident in PSRAM; dirty window restore then meshes + stamps. Room’s `palette[32]` loads with it. **Do not re-raster from a moving VP.** See [lesson 10](./learn/10-gravity-locked-cube.md).
 
 ### Billboard
 A sprite quad that faces the camera.
-**In ESPET:** face the *room* camera, not a second bake heading. See [lesson 11](./learn/11-sheets-and-sprites.md).
+**In ESPET:** **not the pet.** Shadow and FX are stamps. Pet/toys/occluders are rigid meshes. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### Blit
 Copy (and maybe key) pixels onto the framebuffer.
-**In ESPET:** backdrop, then **shadow** stamp, then occluders + pet + toys (Y-sort), then [FX](#fx). L2 five parts; L0 one blob. See [lesson 11](./learn/11-sheets-and-sprites.md).
+**In ESPET:** backdrop restore, **shadow** stamp, then FX stamps. Pet/toys/occluders are **rastered**, not blitted. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### CASET
 ST7789 “column address set” — window X range before RAMWR.
@@ -392,7 +394,7 @@ The smallest rectangle that changed and must be sent to the panel.
 
 ### Dodecahedron
 A 12-face solid whose 20 vertices are evenly spaced directions.
-**In ESPET:** **unused.** Pet sheets are 4 yaws at one elevation, not 20 spherical views. See [lesson 11](./learn/11-sheets-and-sprites.md).
+**In ESPET:** **unused.** Pet is live meshes with continuous yaw, not 4-yaw or 20-view photos. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### FOV
 Field of view of the perspective camera.
@@ -411,23 +413,23 @@ The LCD controller’s own pixel RAM.
 **In ESPET:** holds the last frame when you skip SPI. See [lesson 07](./learn/07-indexed-framebuffer.md).
 
 ### Hotspot
-Pixel in a sprite that sits on the 3D attach point (shoulder, hip).
-**In ESPET:** `hot_x, hot_y` in `SpriteRec`. See [lesson 11](./learn/11-sheets-and-sprites.md).
+Pixel in a **stamp** that sits on a 3D point (shadow feet, FX centre).
+**In ESPET:** `hot_x, hot_y` in `SpriteRec` for shadow/FX only. Pet meshes use mesh origin = attach. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### Impostor
 Using a photo of a 3D object instead of triangles.
-**In ESPET:** part sheets (L2) or a whole-pet blob (L0). Yaw mismatch is accepted. See [lesson 11](./learn/11-sheets-and-sprites.md).
+**In ESPET:** the **room backdrop** is an impostor of the cube. The pet is **not** — it is live rigid meshes. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### Indexed-8
 Each pixel is a 1-byte palette index, not an RGB colour.
-**In ESPET:** FB and atlas. Expand only on scanout. See [lesson 07](./learn/07-indexed-framebuffer.md).
+**In ESPET:** FB and stamps. Meshes write indices at raster time. Expand only on scanout. See [lesson 07](./learn/07-indexed-framebuffer.md).
 
 ### L0
-Lowest pet **draw** LOD: one small billboard (~24–32 px). **Shadow** is a separate floor stamp. Springs still run at 6-wide.
+Lowest pet **draw** LOD: one combined mesh (~24–32 px). **Shadow** is a separate floor stamp. Springs still run at 6-wide.
 **In ESPET:** Hall and Yard (large rooms). Eat is L0 munch at the Hall bowl. See [architecture 1](../architecture.md#two-play-modes).
 
 ### L2
-Close-up pet **draw** LOD: five part sheets (~80–100 px).
+Close-up pet **draw** LOD: six rigid part meshes (~80–100 px), continuous yaw.
 **In ESPET:** Nest and Play (small rooms). See [architecture 1](../architecture.md#two-play-modes).
 
 ### MADCTL
@@ -435,12 +437,12 @@ ST7789 memory-access-control: axis flip and RGB vs BGR.
 **In ESPET:** set once on bring-up; touch axes must match. See [lesson 06](./learn/06-first-pixels.md).
 
 ### Occluder
-A billboard in front of or behind the pet (plant, blanket fold). Scenery pixels stay in the backdrop.
-**In ESPET:** ≤12 per room, S and L. L: depth-sort with blob and toys. S: vs core, or `cover_body` before head. See [architecture 10](../architecture.md#room).
+A static mesh in front of or behind the pet (plant, blanket fold). Scenery pixels stay in the backdrop.
+**In ESPET:** ≤12 per room, ~200 tris total, S and L. L: depth-sort with pet, toys, knockables. S: vs core, or `cover_body` before head. Not a knockable pot. See [architecture 10](../architecture.md#room).
 
 ### Palette
 Table mapping index → RGB565.
-**In ESPET:** 32 colours, **per room**, copied on a door cut. Index 0 = key. **1–15** pet/toys/FX (stable across rooms); **16–31** scenery. See [lesson 07](./learn/07-indexed-framebuffer.md).
+**In ESPET:** 32 colours, **per room**, copied on a door cut. Index 0 = key. **1–15** actor **ramps** (2–3 shades per material, stable across rooms); **16–31** scenery. See [lesson 07](./learn/07-indexed-framebuffer.md).
 
 ### Perspective divide
 After projection, `xyz / w` to get normalized device coordinates.
@@ -466,25 +468,37 @@ ST7789 “write to GRAM” — the pixel burst.
 Turning the CPU’s framebuffer into panel pixels.
 **In ESPET:** indexed → RGB565 bounce → GDMA. See [lesson 07](./learn/07-indexed-framebuffer.md).
 
+### MeshRec
+Record of a packed bind-pose mesh (vertex offset, index offset, counts). Origin = attach.
+**In ESPET:** architecture §10. Pet L2/L0, toys, knockables, occluders. See [lesson 11](./learn/11-sheets-and-sprites.md).
+
+### MatRamp
+Three palette indices (shadow / mid / lit) for one actor material.
+**In ESPET:** N·L at triangle setup picks the band. Indices in 1–15. See [lesson 11](./learn/11-sheets-and-sprites.md).
+
+### Painter's algorithm
+Draw far to near; later pixels overwrite. No z-buffer.
+**In ESPET:** L depth-sorts meshes; S uses baked `draw_order[4]` + `cover_body` + head last. See [architecture 10](../architecture.md#room).
+
 ### Sheet
-One baked photo of a part (L2) or the whole pet (L0) from one yaw heading.
-**In ESPET:** appearance, not physics. 4 yaws. The L0 blob does **not** include the floor shadow. See [lesson 11](./learn/11-sheets-and-sprites.md).
+Old name for a baked photo of a part. **Unused for the pet.**
+**In ESPET:** appearance is live meshes. Shadow/FX remain stamps. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### Shadow
 A floor stamp at the projected core on `y=0`.
-**In ESPET:** own `SpriteRec`, both LODs. Drawn after the backdrop, before occluders, so a plant can hide the blob but not the puddle. See [architecture 10](../architecture.md#room).
+**In ESPET:** own `SpriteRec`, both LODs. Drawn after the backdrop, before meshes, so a plant can hide the pet but not the puddle. See [architecture 10](../architecture.md#room).
 
 ### SpriteRec
-Record of where a sprite lives in the atlas (offset, size, hotspot).
-**In ESPET:** architecture §10. See [lesson 11](./learn/11-sheets-and-sprites.md).
+Record of where a **stamp** lives (offset, size, hotspot).
+**In ESPET:** shadow + FX only. Pet uses `MeshRec`. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### View matrix
 World → camera transform from `look_at`.
 **In ESPET:** room-authored 3/4, never IMU `q`. See [lesson 10](./learn/10-gravity-locked-cube.md).
 
 ### view_idx
-Integer 0…3: which yaw sheet to blit (front, right, back, left).
-**In ESPET:** discrete; the room camera is not. Hysteresis on yaw. See [lesson 11](./learn/11-sheets-and-sprites.md).
+Integer 0…3: which baked painter's **draw-order** table to use (front, right, back, left).
+**In ESPET:** discrete; the room camera is not; pet yaw is continuous. Hysteresis on yaw. **Not** a photo picker. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ---
 
@@ -507,8 +521,8 @@ A camera on a stick looking at a focus point.
 **In ESPET:** **not the product camera.** Habitat uses a room-authored 3/4 `look_at`. See [lesson 10](./learn/10-gravity-locked-cube.md).
 
 ### Clip
-A short animation: keyframed rest poses (and matching sheets), not a film of the whole pet.
-**In ESPET:** writes `rest[]`, optional `vox_id` on start. Policy of *when* to play is TBD. See [lesson 12](./learn/12-clips-springs-hitboxes.md).
+A short animation: keyframed rest poses, not a film of the whole pet and not posed meshes.
+**In ESPET:** writes `rest[]`, optional `vox_id` on start. Bind-pose meshes aim at the masses. Policy of *when* to play is TBD. See [lesson 12](./learn/12-clips-springs-hitboxes.md).
 
 ### Complementary filter
 Fuse sensors that are good in different frequency bands (gyro high-freq, accel low-freq).
@@ -516,7 +530,7 @@ Fuse sensors that are good in different frequency bands (gyro high-freq, accel l
 
 ### Deadband
 Ignore changes smaller than a threshold so noise does not keep the system “busy.”
-**In ESPET:** skip SPI unless springs/toys moved, a clip, or `fx_live`. Not `|Δq|`. See [lesson 10](./learn/10-gravity-locked-cube.md).
+**In ESPET:** skip SPI unless springs moved, a clip, an awake RB, or `fx_live`. Not `|Δq|`. See [lesson 10](./learn/10-gravity-locked-cube.md).
 
 ### Cross product
 Vector perpendicular to two inputs.
@@ -540,11 +554,15 @@ Gyroscope: angular velocity.
 
 ### Hysteresis
 Do not switch until the new choice beats the old by a margin.
-**In ESPET:** yaw sheets, ~0.02 on the heading dot. See [lesson 11](./learn/11-sheets-and-sprites.md).
+**In ESPET:** painter's `draw_order`, ~0.02 on the heading dot. See [lesson 11](./learn/11-sheets-and-sprites.md).
 
 ### Hitbox
 Simple shape used for collision, not the visible pixels.
-**In ESPET:** spheres on `pos` (and optional tips). See [lesson 12](./learn/12-clips-springs-hitboxes.md).
+**In ESPET:** spheres on `pos` (and optional tips). Never mesh triangles. See [lesson 12](./learn/12-clips-springs-hitboxes.md).
+
+### Rigid body
+A free object with mass, inertia, and sleep: toys and knockable props.
+**In ESPET:** cap 3 toys + ≤4 knockables. Nest: zero knockables. Bowl: slide+yaw only. GRAM-hold waits for sleep. See [architecture 8](../architecture.md#8-physics-and-hitboxes).
 
 ### Jerk
 High-pass / sudden change of acceleration.
@@ -567,8 +585,8 @@ What a sensor set can actually determine.
 **In ESPET:** pitch/roll yes; yaw around gravity no. See [lesson 05](./learn/05-quaternions.md).
 
 ### Prop
-A tap magnet in a room (bowl, door, nest marker). Not a rigid body.
-**In ESPET:** ≤8 per room; screen-space pick in L. Hall bowl is the eat magnet (L0 munch). See [architecture 1](../architecture.md#v1-map).
+A tap magnet in a room (bowl, door, nest marker). May also be a knockable rigid body.
+**In ESPET:** ≤8 per room; screen-space pick in L. Hall bowl is the eat magnet (L0 munch) and a floor-constrained RB (slide + yaw, no flip). Nest has no knockables. See [architecture 1](../architecture.md#v1-map).
 
 ### Quaternion
 Four-number rotation (`x,y,z,w` in `SharedSnap`).
@@ -580,7 +598,7 @@ Reset drifted yaw to a “front.”
 
 ### Rotation matrix
 3×3 (or the upper 3×3 of a 4×4) that rotates vectors.
-**In ESPET:** body → world for projection. Pet yaw vs `room.front` picks `view_idx`. See [lesson 04](./learn/04-vectors-matrices-camera.md).
+**In ESPET:** body → world for projection and mesh aim. Pet yaw vs `room.front` picks `view_idx` (draw-order only). See [lesson 04](./learn/04-vectors-matrices-camera.md).
 
 ### Vector
 `(x,y,z)` point or direction.
@@ -699,7 +717,7 @@ Hobby framework on top of similar chips.
 **In ESPET:** not used. See [architecture 0](../architecture.md#0-product-lock).
 
 ### board-sim
-Windows fake Waveshare: GRAM window + fake IMU. No cube logic.
+Windows fake Waveshare: GRAM window + fake IMU. No cube logic and no mesh rasterizer.
 **In ESPET:** `sim.bat`. See [lesson 00](./learn/00-start-here.md).
 
 ### Bring-up

@@ -1,15 +1,17 @@
 # ESPET
 
-Gravity-locked habitat of cube rooms on a [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). Small rooms are the close-up pet; large rooms are the house — a floor shadow, plants you walk behind, a bowl you munch at. Product rules: [architecture.md](architecture.md).
+Gravity-locked habitat of cube rooms on a [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). Small rooms are the close-up pet; large rooms are the house — a floor shadow, plants you walk behind, a bowl you munch at. The room is a photograph; the pet, toys, and knockables are live low-poly meshes. Product rules: [architecture.md](architecture.md).
+
+Hardware bible (pins, schematic, datasheets, hello + `board-sim`): **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). This repo keeps its own sim for habitat work; pin law lives there.
 
 ## Two pieces (do not mix them)
 
 | Folder | What it is |
 | :--- | :--- |
-| [`firmware/`](firmware/) | The program that will run on the ESP32. Talks to the LCD (`esp_lcd`) and IMU (I2C QMI8658). **No SDL, no mouse, no cube renderer in the simulator.** |
+| [`firmware/`](firmware/) | The program that will run on the ESP32. Talks to the LCD (`esp_lcd`) and IMU (I2C QMI8658). Habitat meshes raster here. **No SDL, no mouse, no cube renderer in the simulator.** |
 | [`board-sim/`](board-sim/) | A fake Waveshare: 240×240 ST7789 window + mouse-drag feeding QMI8658-like accel/gyro. Your firmware does not know this exists. |
 
-The rooms, springs, and pet are firmware work you add later. The simulator never draws a habitat.
+The rooms, springs, meshes, and pet are firmware work you add later. The simulator never draws a habitat and never rasterizes a cube.
 
 ## Daily loop (Windows)
 
@@ -54,7 +56,7 @@ Not part of `sim.bat`. Turn `firmware/` into an ESP-IDF project and:
 idf.py -C firmware build flash monitor
 ```
 
-Same `firmware/main.c` (plus real `sdkconfig` pins). Do not put `board-sim/fake_idf` on that include path.
+Same `firmware/main.c` (plus real `sdkconfig` pins). Do not put `board-sim/fake_idf` on that include path. Pins and `BAT_EN` are in the [hardware contract](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md).
 
 ## Mental model
 
