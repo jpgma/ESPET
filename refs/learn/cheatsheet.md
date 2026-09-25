@@ -8,10 +8,10 @@ Keep this open while coding. Pins and schematic: [jpgma/esp32-s3 HARDWARE.md](ht
 2. The pet is complete with the radio off.
 3. World down is real gravity. The screen is a camera, not a world axis.
 4. Sleeping the CPU is a feature. Idle I2S clocks or PA up is the same bug as a static 30 Hz SPI.
-5. Meshes are appearance. Springs are state. Pixels are not physics. LOD is raster, not sim.
-6. Clips write rest. Meshes are bind-pose. Springs only lag that pose.
-7. The camera is room-authored and static per room. Yaw `view_idx` (0..3) is discrete draw-order only.
-8. Core 1 never plays audio. It may emit `SfxEvt`. Core 0 mixes.
+5. Meshes are appearance. The core spring is state. Bone clips are appearance. Pixels are not physics.
+6. Clips write bone locals. The core spring only lags the body. Appendages do not spring.
+7. The camera is room-authored and static until a clip sets `full_frame`. IMU tilt does not orbit.
+8. Core 1 never plays audio. The sim on Core 0 may emit `SfxEvt`. Core 0 mixes.
 
 ## Pins (thin)
 
@@ -44,19 +44,19 @@ C++: `-fno-exceptions -fno-rtti`. IDF ≥ 5.5.
 
 ## Memory one-liners (ESPET)
 
-- Indexed-8 FB in DRAM (2×57.6 KB). RGB565 bounce for SPI.
-- Current **room palette** 32 (64 B), copy on door. Index 0 = key; 1–15 actor **ramps**; 16–31 scenery.
-- Mixer and raster never touch PSRAM. Backdrop restore may copy PSRAM → DRAM fb.
-- Meshes: flash XIP (tiny). Shadow/FX stamps: flash, PSRAM if cache thrashes. Current room backdrop in PSRAM (57.6 KB).
-- `FxPool` ~2 KB DRAM. GRAM-hold: springs settled, RBs sleeping, **`fx_live==0`**.
-- RTC: hunger/happy/sleep/emotion/`room_id`.
+- One indexed-8 FB in DRAM (57.6 KB). Two 8-row RGB565 DMA bands (7.7 KB). Triangle scratch ~32 KB.
+- **Room palette** 256 (512 B), copy on door. Index 0 = key; 1–63 actor **ramps**; 64–255 room.
+- Mixer and raster never touch PSRAM. No backdrop.
+- Meshes and the weighted pet: flash XIP. Shadow/FX stamps: flash. Pose mailbox in DRAM (six bone 3×4s).
+- Awake rigids ≤ 24. `FxPool` 256 stamps. Empty SPI mask when the pose matches.
+- RTC: hunger/happy/sleep/emotion/`room_id`. 8 h is parked.
 
 ## Rates
 
 | What | Rate |
 | :--- | :--- |
 | IMU + filter | 100 Hz |
-| Display + physics | 30 Hz (33.3 ms) |
+| Sim (Core 0) and present (Core 1) | 30 Hz (33.3 ms deadline) |
 | Mixer | 12 kHz, 256-sample blocks |
 | Lizard (later) | 20 Hz |
 | Housekeeping | 1–10 Hz |

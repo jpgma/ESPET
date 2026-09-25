@@ -1,6 +1,6 @@
 # 05 — Fusion, gravity, and IMU events
 
-**Goal:** a unit quaternion `q_device_to_world` at 100 Hz such that world +Y is opposite gravity, plus `jerk` / sparse `imu_evt` for bounce. The **screen camera is not this quaternion.** `view_idx` is pet yaw vs `room.front` (0..3) for **painter's order** only.
+**Goal:** a unit quaternion `q_device_to_world` at 100 Hz such that world +Y is opposite gravity, plus `jerk` / sparse `imu_evt` for bounce. The **screen camera is not this quaternion.** A clip may set `full_frame` and move the camera; tilt does not.
 
 This is not a chip. It is the IMU’s software. Architecture §1 is the spec.
 
@@ -16,7 +16,7 @@ Mahony TAC 2008 (explicit complementary filter on SO(3), gyro bias) is the other
 | :--- | :--- | :--- |
 | Tilt, roll, lay flat | Accel defines **down**. Gyro smooths. Solid. | Room VP **unchanged**. Face-down later → sleep. |
 | Spin on the table | Gyro-only **yaw around gravity**. Drifts. | Must **not** spin the room. PLUS / double-tap are lizard one-shots, not camera recenter. |
-| Shake | High-pass jerk. | Impulse on `vel[]` (cooldown). **Not** the camera. |
+| Shake | High-pass jerk. | Impulse on the core spring (cooldown). **Not** the camera, unless a clip sets `full_frame`. |
 
 No magnetometer on this board. Do not invent a “soft iron” heading.
 
@@ -37,20 +37,19 @@ That is a complementary / explicit Mahony IMU filter. Madgwick’s IMU `updateIM
 
 Classify **after** the filter: `jerk` above threshold + cooldown → `imu_evt = shake`. Spike-then-still → set-down. Face-down from `grav`. Held tilt **off** in v1.
 
-**Do not** feed `q` into Core 1 `look_at`. **Do not** feed linear acceleration into gravity every tick (no snow-globe).
+**Do not** feed `q` into `look_at`. **Do not** feed linear acceleration into gravity every tick (no snow-globe).
 
-## Camera (Core 1, every 33 ms) — not from `q`
+## Camera (published in the pose) — not from `q`
 
 ```
-view     = room.view                 // authored 3/4
-proj     = room.proj
-view_idx = yaw_quad(pet_yaw - room.front)   // 0..3, hysteresis
-lod      = room.lod                  // L0 or L2
+view       = room.view          // authored 3/4, unless a clip overrides it
+proj       = room.proj
+full_frame = clip.full_frame    // shake or close-up; else 0
 ```
 
-The window **stays**. The **mesh rotates** when the pet turns. `view_idx` may tick for draw-order. Never IMU-orbit `cam_pos`. Paper-turn / two-sheet blend are gone.
+The window **stays** until `full_frame`. The **bones** turn when the pet turns. Never IMU-orbit the camera.
 
-Idle SPI: springs settled, no clip, toys/knockables sleeping, `fx_live==0`. **No** `|Δq|` / `|Δcam|` test.
+Idle SPI: the interpolated pose matches the last presented pose. **No** `|Δq|` test.
 
 ## Open question (architecture §18)
 
@@ -58,4 +57,4 @@ Orthonormalize IMU `up` against world +Y only if you draw a **debug** horizon. T
 
 ## Bring-up test (step 4 product test)
 
-Authored Nest backdrop, **no pet** required. Tilt the board: the picture stays put, Earth-up. Shake: a debug mass hops, cooldown, then GRAM-hold. Spin on the table: filter yaw creeps; the room does not. This test is the product. Do not start pet meshes until tilt-does-not-orbit is true.
+Live Nest slab, **no pet** required. Tilt the board: the picture stays put, Earth-up. Shake: a debug core hops, cooldown, then the row mask goes empty. Spin on the table: filter yaw creeps; the room does not. This test is the product. Do not start the skinned mesh until tilt-does-not-orbit is true.

@@ -1,10 +1,12 @@
 # ESPET — Architecture
 
-**A gravity-locked habitat of cube rooms. The screen is a room-authored 3/4 camera. Small rooms put the pet at ~1/3 of the glass; large rooms shrink it to an L0 speck so furniture and toys can exist. IMU jostles contents — it does not orbit the window. Offline-first. Optional LAN cortex.**
+**A gravity-locked habitat of cube rooms. The screen is a room-authored 3/4 camera. The whole room is live flat triangles, including when the camera is still. The pet is one smooth-skinned mesh on six bones. IMU jostles contents — it does not orbit the window. Offline-first. Optional LAN cortex.**
 
-Style: data-oriented C/C++ on ESP-IDF. POD tables, integer IDs, no STL in the hot path, no exceptions, no RTTI, no LVGL, no Arduino. One Core 1 loop. As little abstraction as the hardware forces.
+Style: data-oriented C/C++ on ESP-IDF. POD tables, integer IDs, no STL in the hot path, no exceptions, no RTTI, no LVGL, no Arduino. Core 0 simulates. Core 1 only presents. As little abstraction as the hardware forces.
 
-**On the chip there is no skinned skeleton.** Six point-masses, clips of rest positions, rigid bind-pose meshes aimed from those masses. An armature exists in Blender only, as the authoring tool.
+**On the chip there is a six-bone smooth skin.** Two influences per vertex. Clips write bone-local transforms. The core is still one spring (gravity, squish, shake, floor). Appendages are not springs. An armature in Blender is the authoring tool and the runtime skeleton.
+
+Look references (nearest-neighbor panel pixels, not asset bakes): [refs/look/](refs/look/).
 
 ---
 
@@ -19,30 +21,32 @@ Style: data-oriented C/C++ on ESP-IDF. POD tables, integer IDs, no STL in the ho
 | Touch | CST816 (I2C, one finger) |
 | Audio | **v1.** ES8311 + NS4150B. Procedural **2-voice** mixer on Core 0. ES7210 **off** (mic later). Speaker on MX1.25 **TBD at bring-up**. |
 | Storage | TF slot present. **Unused in the frame loop.** Audio is not on the card. |
-| Display rate | **30 FPS** cap. Physics in the same 33 ms loop. |
-| Battery | ~1000 mAh. **Strive for ~8 h** awake, dim — not a hard cap. Wi-Fi is a luxury mode. |
-| Look | Low-poly, hard edges, Spore Creatures (NDS) silhouette. **Hybrid raster:** baked room photograph + live rigid meshes (continuous yaw, one directional light, N·L shade bands). Not camera-facing photos, not a skinned GPU pet. |
-| Camera | **Room-authored** 3/4 `look_at` (elev ~40°, azimuth = `room.front`). FOV ~55°. **Never** from IMU `q`. IMU parallax **off** in v1. |
-| Pet draw | **L2** (S rooms): 6 rigid part meshes, bind-pose, aimed from attach → `pos`/`tip`. **L0** (L rooms): 1 combined mesh at the core 3×4. **Shadow** is a separate floor stamp, both LODs. LOD is a **room field**. No 4-yaw pet atlas. No L1. No runtime triangle *room*. |
-| Pixels | **Indexed-8** framebuffer. **Per-room** palette 32, color 0 = key. Indices **1–15** actor **ramps** (2–3 consecutive shades per material, stable across rooms); **16–31** scenery (backdrop). Expand to RGB565 only on SPI scanout. FX / shadow stamps stay indexed-8. |
-| Room draw | Resident **240×240 indexed backdrop** in PSRAM. Floor **shadow** stamp, then painter's occluder meshes (≤12, S and L) + pet + toys + knockable props, then event **FX** stamps. **Do not re-raster the backdrop from a moving VP.** |
-| Map | **S and L only.** v1 rooms: Nest S, Play S, Hall L, Yard L. Kitchen = bowl **prop** in Hall. Eat is **L0 munch** at that bowl. Budget 8 rooms in flash. Do not bake night as extra backdrops. |
-| Motion | Clips write **rest**. Springs write **pos**. Hitboxes follow **pos**. Meshes are bind-pose; springs lag. L0 walk = core translation + rest bob (no walk-cycle film). L0 eat = mesh squash. |
-| Physics extras | Toys (cap **3**) and knockable props (cap **≤4**) are sleeping rigid bodies. Static scenery is kinematic AABBs in the bake. Nest has **no** knockables. Hall bowl is floor-constrained (slide + yaw, **no flip**). |
-| FX | Event pool **64**, world `-Y`, floor only. Kinds: **dust, crumbs, leaves**. No alpha. One SFX per burst. Stamps, not cards, in v1. |
+| Display rate | **30 FPS** cap. One period for still frames and for full-frame clips. |
+| Battery | ~1000 mAh. **8 h is parked.** Dirty rows and an empty SPI mask stay so a still frame fits in 33 ms. Wi-Fi is a luxury mode. |
+| Look | Low-poly, hard edges, flat facets, Spore Creatures (NDS) silhouette. **Live raster of the whole room**, always. Three N·L bands at triangle setup. No photograph, no textures, no alpha, no z-buffer. Panel refs: [forest](refs/look/espet_flat_forest_clearing_240.png), [night](refs/look/espet_flat_night_sleep_240.png), [play](refs/look/espet_flat_physics_play_240.png), [close-up](refs/look/espet_flat_closeup_240.png). |
+| Camera | **Room-authored** 3/4 `look_at` (elev ~40°, azimuth = `room.front`). FOV ~55°. **Never** from IMU `q`. A scripted shake or close-up sets `full_frame` and may move the camera for that clip only. |
+| Pet draw | **One** smooth-skinned mesh, six bones, **two** influences per vertex. Close vs far is the camera and the room size, not a second mesh. **Shadow** is a floor stamp. |
+| Pixels | **Indexed-8**, one framebuffer. **Per-room** palette **256** RGB565. Index **0** = key. **1–63** actor ramps (2–3 consecutive shades per material, stable across rooms). **64–255** room. Expand to RGB565 only into DMA bands. |
+| Room draw | Live triangles every presented frame: sky bands, slab, props, then the skinned pet and rigid meshes, then the shadow stamp and FX stamps. A still camera may cache static screen-space triangles only when that cache matches a full redraw. |
+| Map | **S and L only.** v1 rooms: Nest S, Play S, Hall L, Yard L. Kitchen = bowl **prop** in Hall. Eat is a core **squash** plus crumbs at that bowl. Budget 8 rooms in flash. Night is a palette plus dimmer faces, not a second scene. |
+| Motion | Clips write **bone locals**. FK writes bone world matrices. The core spring writes **core pos**. Hitboxes follow **bone joints**. Skinning happens at triangle setup on Core 1. |
+| Physics extras | One rigid array, cap **24 awake**. Sleeping bodies drop out of the visible scratch while the camera is still. Nest content stays quiet so a sleep pose can settle. Hall bowl is floor-constrained (slide + yaw, **no flip**). |
+| FX | Stamp pool **256**, world `-Y`, floor or life only. Kinds: **dust, crumbs, leaves**. No alpha. No particle–particle. No triangle cards in v1. One SFX per burst. |
 | Brain | Offline-first. **Lizard-brain *when*** is TBD. Spatial **hooks** are locked (Nest clips, Hall/Yard wander, Play toys, door swap, Hall eat squash, shake → dust/leaves). |
-| Parts kit | **Not v1.** Slot IDs exist now so a kit is more mesh ids + `part_ids[6]`, not a new renderer. |
+| Parts kit | **Not v1.** The skeleton is six bones. A later kit swaps the weighted mesh, not the bone count. |
 
 **Golden rules**
 
-1. Core 1 never waits on Core 0, Wi-Fi, or the LLM.
+1. Core 1 never waits on Core 0, Wi-Fi, or the LLM. A stalled sim holds the last pose.
 2. The pet is complete with the radio off.
 3. World down is real gravity. The screen is a camera, not a world axis.
-4. Sleeping the CPU is a feature. Spinning at 240 MHz with a static frame is a bug. **Silence with I2S clocks or the PA up is the same bug.**
-5. Meshes are appearance. Springs are state. Pixels are not physics. **LOD is raster, not sim.**
-6. Clips write **rest**. Meshes are **bind-pose**. Springs only lag that pose.
-7. The camera is **room-authored** and static per room. Yaw `view_idx` (0..3) is discrete **draw-order** only — not a photo picker.
-8. Core 1 never plays audio. It may **emit** an `SfxEvt`. Core 0 mixes.
+4. A still pose does not ship pixels. Spinning at 240 MHz with a static frame is a bug. **Silence with I2S clocks or the PA up is the same bug.** The 8 h target is later; the empty mask is how the 33 ms tick survives.
+5. Meshes are appearance. The core spring is state. Bone clips are appearance. Pixels are not physics.
+6. Clips write **bone locals**. The core spring only lags the body. Appendages do not spring.
+7. The camera is **room-authored** and static per room until a clip sets `full_frame`. IMU tilt does not orbit.
+8. Core 1 never plays audio. The sim on Core 0 may **emit** an `SfxEvt`. Core 0 mixes.
+
+The raster core this product calls (filler, clip, pose mailbox) is the learning track in **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154/docs/raster`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154/docs/raster). Do not copy that track's "Wi-Fi up in the steady state" policy. Radio stays off unless cortex.
 
 ---
 
@@ -72,12 +76,14 @@ Pet height = `1.0` world unit.
 | Floor | ~2×2 pet-lengths | ~8×8 pet-lengths |
 | Camera | frames **pet** | frames **room AABB** |
 | Pet on glass | ~80–100 px | ~24–32 px |
-| Draw | **L2** — 6 part meshes, continuous yaw + shadow stamp | **L0** — 1 combined mesh + shadow stamp, continuous yaw |
-| Tap | part spheres | screen-space slop ≥24 px (pet / toys / props) |
+| Draw | the same skinned mesh | the same skinned mesh, smaller in frame |
+| Tap | bone-joint spheres | screen-space slop ≥24 px (pet / toys / props) |
 | For | wave, poke, sleep, blink | wander, doors, IMU bounce, eat at bowl |
 | Dirty rect | ~120×140 | ~32×32 pet + movers; FX may fatten |
 
-No M atlas. No follow-cam in L. Door = smash cut (or ~200 ms full-frame slide). No live downsample of L2 into L.
+No follow-cam in L. Door = smash cut (or ~200 ms full-frame slide). A close-up is a **camera clip**, not a room and not a second mesh.
+
+The inspo sheet is the look, not the map. Yard reads as the forest clearing. Nest sleep reads as the night slab. Play reads as the pet and a ball.
 
 ### v1 map
 
@@ -87,78 +93,72 @@ Nest S  ←→  Hall L  ←→  Yard L
            Play S
 ```
 
-| Room | Size | LOD | Role |
-| :--- | :--- | :--- | :--- |
-| **Nest** | S | L2 | Sleep, poke, close-up clips; blanket `cover_body` occluder mesh. **No knockables.** |
-| **Play** | S | L2 | 1–3 toy RBs; limb vs ball; optional 1 knockable chair |
-| **Hall** | L | L0 | Wander, doors, bowl prop (eat magnet → L0 munch + crumbs). Bowl **slides + yaws**, does not flip. Optional 1 chair. |
-| **Yard** | L | L0 | Wander, scenery, **≤3** toy RBs, IMU bounce, leaf FX on shake. 1 knockable pot; plant occluder stays kinematic |
+| Room | Size | Role |
+| :--- | :--- | :--- |
+| **Nest** | S | Sleep, poke, close-up clips. Content stays quiet so a sleep pose can settle. |
+| **Play** | S | Toys; limb joints vs ball |
+| **Hall** | L | Wander, doors, bowl prop (eat magnet → core squash + crumbs). Bowl **slides + yaws**, does not flip. |
+| **Yard** | L | Wander, scenery, toys, IMU bounce, leaf FX on shake |
 
 **Caps per resident room**
 
 | Thing | Cap |
 | :--- | ---: |
 | Scenery AABBs | 24 |
-| Props (tap magnets; may also be knockable) | 8 |
-| Dynamic toys (rigid bodies) | **3** in Play S and in an L room |
-| Knockable props (rigid bodies) | **≤4** (Nest: **0**) |
+| Props (tap magnets; may also be rigid) | 8 |
+| Awake rigid bodies | **24** |
 | Doors | 4 (one per wall, may be none) |
-| Occluder meshes | 12 (S and L); **~200 tris total** |
-| Event FX | 64 (resident pool) |
+| Visible triangles | **~1024** (room + pet + movers) |
+| Event FX stamps | 256 |
 
-Scenery is **in the backdrop**. Props / toys / occluders / shadow / FX are drawn on top. Knockables and occluders are **not** painted into the bake (leave a hole or a baked contact shadow). **Static scenery does not rigid-body.** Toys and the knockable subset do. FX collide `y=0` only.
+Sky is a few horizontal quads. A floor is a handful of large triangles, not a grass texture. Static contact darkening is authored darker faces under props. The moving pet's shadow is a floor stamp.
 
-One resident room. Extra rooms later are pak data, not engine work. Flash budget **8** backdrops. Night is a palette, not a second bake.
+One resident room. Extra rooms later are pak data, not engine work. Flash budget **8** rooms. Night is a palette and dimmer faces, not a second bake.
 
-### Habitat photographs
+### Habitat shots
 
 Art north star (engine hooks, not lizard *when*):
 
-1. Hall: L0 walks behind a plant mesh; **shadow stays on the floor**.
-2. Smash cut Hall → Nest (door hole colour continuity).
-3. Nest: blanket `cover_body` occluder; **head on top**.
-4. Hall bowl: **L0 munch** + crumb burst + one patch. No Kitchen. No L2-in-L. Bowl does not flip.
-5. Yard shake: leaves fall with real `-Y`. A pot can tip; the plant occluder stays put.
+1. Hall: the skinned pet walks behind a plant mesh; **shadow stays on the floor**.
+2. Smash cut Hall → Nest (door).
+3. Nest: a sleep clip on the bones; the core spring settles.
+4. Hall bowl: **core squash** + crumb burst + one patch. No Kitchen. Bowl does not flip.
+5. Yard shake: leaves fall with real `-Y`. A prop can tip. A scripted camera shake may set `full_frame` for that burst.
 
-Bring-up on silicon still starts at Nest backdrop + bounce (§15). Do not skip to these shots.
+Bring-up on silicon still starts at a live Nest slab + bounce (§15). Do not skip to these shots.
 
 ### 6-axis IMU: sense always, play sparsely
 
 QMI8658 observes gravity (accel) and angular velocity (gyro). That fully determines **pitch and roll**. It cannot observe **yaw around gravity**. No magnetometer.
 
-Core 0 still runs the complementary filter at 100 Hz and publishes `q_device_to_world`, `grav`, `jerk`. Core 1 **does not** build a camera from `q`. Classify on Core 0; fire one-shots.
+Core 0 runs the complementary filter at 100 Hz. It does **not** build a camera from `q`. Classify on Core 0; fire one-shots into the sim, which is also on Core 0.
 
 | Event | Detect | Play | Rate cap |
 | :--- | :--- | :--- | :--- |
 | Idle | `\|ω\|` and `\|jerk\|` below epsilon | nothing | — |
-| Shake | `jerk` above threshold | impulse on core (+ head in S); toys and knockables inherit; **dust** at feet; Yard may emit **leaves** | ~200 ms cooldown, ~5 Hz |
+| Shake | `jerk` above threshold | impulse on the core spring; awake rigids inherit; **dust** at feet; Yard may emit **leaves**; a clip may also set `full_frame` camera shake | ~200 ms cooldown, ~5 Hz |
 | Set-down | spike then still | one startle | edge |
 | Face-down | existing | no new Sfx; finish tail; sleep | edge |
 | Held tilt | — | **off in v1** | — |
 
-**Tilt does not change world gravity.** Springs always use `-Y`. Bounce is `vel[]`, not a snow-globe. Gaze may pull the head rest toward a look target additively (S rooms).
+**Tilt does not change world gravity.** The core spring uses `-Y`. Bounce is `vel`, not a snow-globe.
 
-PLUS short-press and CST816 double-tap are **one-shots** in the snapshot. They are **not** yaw-recenter (there is no IMU camera yaw). Mapping TBD with the lizard brain (call pet, send to Nest). Not volume.
+PLUS short-press and CST816 double-tap are **one-shots**. They are **not** yaw-recenter. Mapping TBD with the lizard brain. Not volume.
 
-### Authored camera, discrete draw-order
+### Authored camera, optional full-frame clip
 
 Each room stores a baked `view` / `proj` (or enough to rebuild `look_at`). Same FOV in Blender as runtime.
 
 ```
 view        = room.view                 // 3/4; elev ~40°; azimuth = room.front
 proj        = room.proj                 // perspective ~55°, aspect 1.0
-view_idx    = yaw_quad(pet_yaw - room.front)   // 0..3, hysteresis; draw-order only
-lod         = room.lod                  // L0 or L2
 light_dir   = room.light_dir            // world-space unit; Nest window, Yard sun
+full_frame  = clip wants a moving camera // shake or close-up; else 0
 ```
 
-`yaw_quad`: nearest of front / right / back / left. **Hysteresis:** do not switch unless the new winner beats the current by a small margin (e.g. 0.02 on the yaw-direction dot, or a few degrees). Stops **painter's order** chatter, not texture pop — there is no yaw sheet.
+A clip that sets `full_frame` may replace `view` for its duration (damped shake, or a dolly onto the pet). When the clip ends, the room view returns. Any camera move of more than a pixel dirties all 240 rows. IMU pitch and roll do **not** drive this in v1.
 
-Pet yaw is **continuous**. Part meshes rotate with the core 3×4 (and limb aim). Do not interpolate silhouettes. Do not paper-turn. Do not blend two photos.
-
-**Pivots / transforms:** `project(world(pos[i]))` with the room VP. L2 limbs **aim** bind +Y (or an authored axis) along attach → `pos`/`tip`. That is a rigid 3×4, not skinning. Do **not** also rotate a billboard to a bake camera.
-
-**Idle SPI:** skip if springs settled, no clip, toys **and knockables sleeping**, **`fx_live==0`**. **No** `|Δq|` / `|Δcam|` camera test — the window does not twitch with the IMU. USB/studio may **full-frame** while `fx_live`; battery still unions dirty AABBs and holds after the burst. Rigid-body **sleep** is mandatory or GRAM-hold never returns.
+**Idle present:** Core 1 skips SPI if the interpolated pose matches the last presented pose (bones, rigids, FX, camera). **No** `|Δq|` camera test. A still camera may keep static triangles in screen-space scratch and refill only the dirty window, but that cache must match a full redraw of those triangles. Rigid-body **sleep** is what lets the mask go empty.
 
 ---
 
@@ -177,154 +177,114 @@ Thin lock (do not invent pins):
 
 **sdkconfig:** `CONFIG_SPIRAM_MODE_OCT=y`, `CONFIG_SPIRAM_SPEED_80M=y`, quad flash 80 MHz (not OPI), `CONFIG_FREERTOS_HZ=1000`, Bluetooth **off**, Wi-Fi started only in cortex mode, USB CDC on boot.
 
-**SPI:** try 80 MHz; fall back to 40 MHz. Full 240×240 RGB565 @ 40 MHz ≈ 23 ms → that is why 30 FPS and **dirty-rect**. Door cuts may pay the full frame once. Extra slack at 80 MHz is how mesh overdraw stays fun — measure on silicon before designing around 40.
+**SPI:** try 80 MHz; fall back to 40 MHz. Full 240×240 RGB565 @ 40 MHz ≈ 23 ms. That is why 30 FPS and **dirty rows**. A `full_frame` clip or a door pays the full frame. Extra slack at 80 MHz is how overdraw stays inside the tick — measure on silicon before designing around 40.
 
 ---
 
 ## 3. Memory
 
-Wi-Fi DMA cannot live in PSRAM. Dual RGB565 frames (2×115 KB) plus radio is a bad bet.
+Wi-Fi DMA cannot live in PSRAM. One indexed frame plus the radio is the plan. A second indexed frame is not reserved. A 16-bit z-buffer (115 KB) is not reserved.
 
 | Region | Use |
 | :--- | :--- |
-| **Internal DRAM** | Two **8-bit indexed** framebuffers (2×57.6 KB), **current room 32-entry** RGB565 palette (256-slot table still fine), RGB565 scanline bounce for SPI, `Bodies` + `toys[3]` + `knock[4]` (~1 KB), `FxPool` (~2 KB), room runtime (~0.5 KB), seqlock snapshot, `SfxEvt` ring, two synth voices, 256-sample I2S mix bounce, clip playback scratch, cached `MeshRec`s (parts + occ + toys + props) and stamp `SpriteRec`s (shadow + FX), RTOS stacks. Raster/blit inner loop **never** touches PSRAM. Mixer **never** touches PSRAM. No z-buffer. No RGB scratch. |
-| **Octal PSRAM** | **Current** room backdrop 57.6 KB. Optional next-room prefetch 57.6 KB. Stamp pixels if XIP cache thrash shows up. Not the framebuffer. Not audio. Not meshes (those are tiny; XIP). |
-| **16 MB flash** | Firmware, clip tracks, `MeshRec`s + packed verts/indices, `MatRamp[]`, room records, **per-room palettes** + `light_dir`, backdrops, FX/shadow stamps, `SynthPatch[]`. XIP for cold tables and meshes. **No PCM in v1.** **No 4-yaw pet atlas.** |
-| **RTC SRAM** | Hunger, happy, sleep, last emotion, **`room_id`**, later `part_ids[6]`. |
+| **Internal DRAM** | One **8-bit indexed** framebuffer (57.6 KB). Palette 256×RGB565 (512 B). Two DMA bands, 8 rows: `2 × 8 × 240 × 2 = 7680` B. Screen-space triangle scratch for ~1024 tris (~32 KB). Pose mailbox, three slots (camera + six bone matrices + rigid instances). Core spring, `Rigid[24]`, `FxPool` 256, seqlock, `SfxEvt` ring, two synth voices, 256-sample I2S mix bounce, clip scratch, RTOS stacks. Raster inner loop **never** touches PSRAM. Mixer **never** touches PSRAM. No z-buffer. No RGB framebuffer. |
+| **Octal PSRAM** | Optional cold copies (next-room mesh prefetch, stamp pixels if XIP thrashes). Not the framebuffer. Not audio. Not the pose. Not a backdrop. |
+| **16 MB flash** | Firmware, bone clips, weighted pet mesh, room meshes, `MatRamp[]`, room records, **per-room palettes** + `light_dir`, FX/shadow stamps, `SynthPatch[]`. XIP for cold tables and meshes. **No PCM in v1.** |
+| **RTC SRAM** | Hunger, happy, sleep, last emotion, **`room_id`**. |
 
-**Scanout:** indexed back buffer → expand dirty rows to RGB565 bounce → GDMA to ST7789.
-
-**Backdrop restore:** copy the dirty window **PSRAM → DRAM fb**, then raster meshes and blit stamps in DRAM. Do not keep all 8 backdrops in PSRAM.
-
-Fallback: one RGB565 (115 KB), serialize raster then DMA.
+**Scanout:** indexed frame → expand dirty rows through the palette into a DMA band → GDMA to ST7789. Two bands so expand of band *k+1* overlaps DMA of band *k*.
 
 **Budget picture**
 
 | Block | Where | Size |
 | :--- | :--- | :--- |
-| `Bodies` + toys + knock | DRAM | ~1 KB |
-| `FxPool` | DRAM | ~2 KB |
-| Room runtime | DRAM | ~0.5 KB |
-| Room palette | DRAM | 64 B (copy on door) |
-| Emotion rests | DRAM or flash | ~200 B |
-| Clip tracks | flash | KB |
-| L2 / L0 meshes | flash XIP | see §11 |
-| Shadow + FX stamps | flash | few KB |
-| Resident backdrop | PSRAM | 57.6 KB |
-| `SynthPatch[]` | flash → DRAM copy | ~16 B × N (tiny) |
-| 4 yaw headings | DRAM | 48 B (draw-order only) |
+| Indexed frame | DRAM | 57.6 KB |
+| Palette | DRAM | 512 B |
+| DMA bands | DRAM | 7.7 KB |
+| Triangle scratch (~1024) | DRAM | ~32 KB |
+| Pose × 3 | DRAM | ~2–4 KB |
+| Core spring + `Rigid[24]` | DRAM | ~2 KB |
+| `FxPool` 256 | DRAM | ~8 KB |
+| Pet mesh + weights | flash XIP | a few KB |
+| Room meshes, 4 rooms | flash XIP | tens of KB |
+| Palettes | flash | 4 × 512 B |
+| Shadow + FX stamps | flash | a few KB |
+| Firmware | flash | ~1–1.5 MB |
 
-**Pak.** Meshes are tiny. 240×240 backdrop = 57.6 KB. Stamp 8×8 = 64 B.
-
-| Block | Count | Bytes |
-| :--- | ---: | ---: |
-| L2 idle | 6 part meshes × ~24–40 tris | **~2–4 KB** |
-| L2 blink | closed-eye head mesh (or 2-tri lids) | ~0.5 KB |
-| L2 wave | rest tracks only (core + arm_r) | **96 B** rest |
-| L0 pet | 1 combined mesh (~40–80 tris) | **~1–2 KB** |
-| Backdrops | 4 ship / 8 cap | 230 / 461 KB |
-| Palettes + ramps | 4 rooms × 32 × RGB565 + `MatRamp[]` | ~0.5 KB |
-| Occluder meshes | ≤12 objects, ~200 tris total | ~8–16 KB |
-| Shadow stamps | 2 sizes (S/L) | ~1–2 KB |
-| FX stamps | 4–8 of 8×8 or 16×16 | ~2–8 KB |
-| Prop / toy meshes | ≤3 toys + ≤4 knockables × ~12–40 tris | ~4–8 KB |
-| **v1 first-art pak** | idle L2+L0 meshes + 4 backdrops + palettes + stamps | **~250–280 KB** |
-| **v1 full clips pak** | + wave rest + blink mesh + 8 rooms | **~0.6–0.8 MB** |
-| Firmware | IDF | ~1–1.5 MB |
-| **Flash used** | | **~2–2.5 MB / 16 MB** |
-
-Spend the sheet-atlas savings on better backdrops or extra occluder plants — **not** a second night bake.
-
-TF still unused.
+There is no 57.6 KB backdrop and no 230 KB of room photographs.
 
 ---
 
 ## 4. Core allocation
 
-### Core 0 — lizard brain, sensors, mixer, optional radio
+### Core 0 — sensors, sim, mixer, optional radio
 
 | Prio | Job | Rate |
 | :--- | :--- | :--- |
 | IDF (~22) | Wi-Fi / LwIP | cortex mode only |
 | 12 | QMI8658 FIFO + complementary filter + **IMU event classify** | 100 Hz |
 | 11 | CST816 IRQ → poke UV, double-tap one-shot | event |
-| 8 | Needs, wander, gaze, flinch, clip requests, room walk, cortex inject | 20 Hz |
+| 8 | Needs, wander, gaze, clip requests, room walk, cortex inject | 20 Hz |
 | 7 | Mixer: fill I2S, PA gate, codec I2C start/stop | 12 kHz / 256-sample block |
+| 6 | **Sim:** core spring, FK, rigid bodies, particles, collide, publish pose | 30 Hz |
 | 5 | Backlight, VBAT, BAT_EN, PWR, Wi-Fi up/down | 1–10 Hz |
 
-**One I2C owner** on 41/42. ES8311 register writes only on play start/stop/volume — never inside the 100 Hz IMU drain. ES7210 not initialized.
+Sim sits **under** the mixer. A long solve must not starve I2S. Slice the solver or drop a publish; do not block the mixer. **One I2C owner** on 41/42. ES8311 register writes only on play start/stop/volume — never inside the 100 Hz IMU drain. ES7210 not initialized.
 
-### Core 1 — the body (one pinned task)
+### Core 1 — present only (one pinned task)
 
 ```
 forever:
-    t0 = CCOUNT
-    snapshot shared_state
-    apply_imu_evt(snap)             // maybe impulse vel[]; never camera
-    sample_clip_or_emotion → rest[] // body space
-    rest_head += gaze_offset        // additive, optional; S rooms
-    step_springs(dt)                // gravity -Y on core only
-    step_rigid(dt)                  // toys + knockables; sleep when still
-    collide()                       // AABBs + spheres + RBs; may push SfxEvt
-    step_fx(dt)                     // world -Y; floor y=0; kinds dust/crumbs/leaves
-    view_idx = yaw_quad(pet_yaw - room.front)   // painter's order only
-    if dirty:                       // springs, clip, awake RBs, fx_live, view_idx — not |Δq|
-        restore_bg(dirty_rect)      // PSRAM backdrop → DRAM fb
-        blit_shadow()               // floor stamp at projected core on y=0
-        raster_meshes()             // occ + pet + toys + knock; painter's; N·L at tri setup
-        blit_fx()                   // event specks on top; no alpha
-        wait previous DMA
-        kick DMA(dirty_rect)
-    sleep_until(t0 + 33.3ms)
+    t0 = deadline                      // absolute 33333 µs, not delay-after-work
+    load latest pose                   // atomic acquire; keep previous pose
+    interpolate to this deadline       // nlerp bones and instance rotations; lerp translations
+    if pose matches last presented:
+        sleep until next deadline      // empty mask, no SPI
+    else:
+        skin + raster into indexed FB  // room, then pet and movers; N·L at setup
+        blit shadow + FX stamps
+        expand dirty rows into DMA bands
+        kick DMA
+    sleep until next deadline
 ```
 
-Lock with `CCOUNT` / gpTimer. If springs settled, no clip, toys and knockables **sleeping**, **`fx_live==0`**, **do not SPI**. GRAM holds. USB/studio may pay full-frame while FX live.
+If a frame is still running when the next tick arrives, count a missed deadline and finish the frame. Do not start a second frame on top of it.
 
-On door: load neighbor backdrop **and palette** into DRAM/PSRAM, copy `light_dir`, spawn pet on the opposite face, retarget `room.view` / clamp, full-frame (or slide) once.
+Lock with `CCOUNT` / gpTimer. Core 1 does not step physics, does not read the IMU, and does not touch I2C.
+
+On door: Core 0 loads the neighbor meshes and palette, publishes a pose with `full_frame`, spawns the pet on the opposite face.
 
 ---
 
-## 5. Inter-core state (seqlock, DRAM only)
+## 5. Pose mailbox (DRAM only)
 
-Two slots + acquire/release. `volatile` is not a barrier on Xtensa SMP.
+Three slots. The publisher never waits for present. The renderer never waits for the publisher. `volatile` is not a barrier on Xtensa SMP.
 
 ```c
 typedef struct {
     uint32_t seq;
+    uint32_t time_us;
 
-    float    q_x, q_y, q_z, q_w;   // still published; not a camera input
-    float    grav_x, grav_y, grav_z;
-    float    jerk;
+    float    cam_view[16];     // or eye/target/up if you rebuild look_at
+    float    bone[6][12];      // world 3×4, ~288 B
+    float    core_x, core_y, core_z;
+    float    core_scale[3];    // squash
 
-    uint8_t  imu_evt;           // 0 none, 1 shake, 2 setdown, 3 facedown
-    uint8_t  plus;              // one-shot; lizard TBD
-    uint8_t  double_tap;        // one-shot; lizard TBD
+    uint8_t  full_frame;       // 1 = all 240 rows
+    uint8_t  n_rigid;
+    uint8_t  n_fx;
     uint8_t  room_id;
-    uint8_t  emotion;
-    uint8_t  action;
-    uint8_t  mood;
-    uint8_t  cortex_live;
-    uint8_t  clip_id;           // 0 = none; lizard/cortex request
-    uint8_t  clip_restart;      // one-shot
-
-    float    walk_x, walk_z;
-    float    gaze_yaw, gaze_pitch;
-
-    uint8_t  poke;
-    float    poke_u, poke_v;
-} SharedSnap;
-
-DRAM_ATTR SharedSnap g_shared[2];
-_Atomic uint32_t     g_shared_idx;
+    // followed by packed rigid instances and FX positions for this slot
+} Pose;
 ```
 
-Core 1 copies one coherent snapshot per tick and never reads `g_shared` again that frame.
+Core 1 loads the latest published slot and the previous one. It interpolates to the **frame deadline**, not to "whenever the sim last ran." If the newest timestamp is older than one period, draw that pose as-is. Do not extrapolate.
 
-UDP packets are packed little-endian, **not** this struct. Cortex `target_x/z` is **in-room**. `room_id` in the packet is later; v1 inbox stays as today plus on-device `room_id` in RTC / snap.
+A torn slot is rejected (seqlock, or a sentinel word written first and last).
 
-### Core 1 → Core 0: sound events
+### Sim → mixer
 
-`SharedSnap` does not go this way. Collisions live on Core 1. A tiny overwrite-oldest SPSC; Core 1 **never waits**.
+Collisions and the mixer share Core 0, but the solver must not call the mixer. A tiny overwrite-oldest ring. Sim priority is below the mixer, so a push never waits.
 
 ```c
 enum { SFX_Q = 8 };
@@ -332,102 +292,90 @@ enum { SFX_Q = 8 };
 typedef struct {
     uint8_t id;      // patch_id; 0 = none
     uint8_t vel;     // Q8 closing speed → gain / f0
-    uint8_t tag;     // pair / part; optional
+    uint8_t tag;
 } SfxEvt;
-
-DRAM_ATTR SfxEvt     g_sfx[SFX_Q];
-_Atomic uint8_t      g_sfx_w;
-_Atomic uint8_t      g_sfx_r;
 ```
 
-Full → drop oldest. Core 0 also **pokes the mixer directly** (clip start, flinch / shake yelp). Same consumer, two producers. See §9.
+Full → drop oldest. Clip start and shake yelp poke the mixer directly (voice B).
+
+UDP packets are packed little-endian, **not** `Pose`. Cortex `target_x/z` is **in-room**.
 
 ---
 
-## 6. Runtime representation (not a skeleton)
+## 6. Runtime representation
 
-**Authoring:** Blender armature, 6 bones (core parent of the five). Key clips there. Export **bind-pose** meshes per part (L2) and one combined mesh (L0). Origin of each part mesh at the attach.
+**Authoring:** Blender armature, 6 bones (core parent of the five). Key clips there. Export one weighted mesh (two influences max) and the bone-local keys.
 
-**Device:** 6-wide SoA. No bind-pose inverse, no bone stack, no skinning, no blend tree. **Always simulate 6 masses**, including in L0. LOD does not desimulate limbs.
+**Device:** the core is one spring. The other five bones are FK from the clip, plus an optional one-pole jiggle on the local rotation. No appendage springs. No blend tree. No IK.
 
 ```c
-enum { PART_COUNT = 6 };
+enum { BONE_COUNT = 6 };
 enum {
-    PART_CORE = 0,
-    PART_HEAD,
-    PART_ARM_L, PART_ARM_R,
-    PART_LEG_L, PART_LEG_R
+    BONE_CORE = 0,
+    BONE_HEAD,
+    BONE_ARM_L, BONE_ARM_R,
+    BONE_LEG_L, BONE_LEG_R
 };
 
 typedef struct {
-    float pos[PART_COUNT][3];     // simulated; hitboxes live here
-    float vel[PART_COUNT][3];
-    float rest[PART_COUNT][3];    // this tick, from idle table or clip
-    float k[PART_COUNT];
-    float d[PART_COUNT];
-    float radius[PART_COUNT];
-    float tip[PART_COUNT][3];     // optional; hand/foot for toys and limb aim
-} Bodies;
+    float pos[3];          // simulated core
+    float vel[3];
+    float rest[3];         // core rest; body space
+    float k, d;
+    float radius;
+    float scale[3];        // squash
+} CoreSpring;
+
+typedef struct {
+    float local_q[4];      // after clip sample + optional jiggle
+    float local_t[3];
+    float world[12];       // FK result, copied into the pose
+    float joint[3];        // hitbox centre, world
+    float radius;
+} Bone;
 ```
 
-Simulate in **body space** (core at origin, +Y up, yaw = 0). Apply one core 3×4 (world translation + yaw, plus squish scale) only for projection, core-vs-room collision, S-room framing, and **mesh transforms**.
+Simulate the core in **body space** (origin, +Y up, yaw = 0), then one core 3×4 (world translation + yaw + squash) parents the skeleton.
 
-L2 mesh transform (rigid, not skinned):
-
-- Core: that 3×4.
-- Head / limbs: translate to `world(pos[i])`, **aim** bind +Y (or authored axis) along attach → `pos`/`tip`. Gaze is already in `rest_head`.
-
-L0: one combined mesh at the core 3×4. Squash (bounce / eat) = non-uniform scale.
-
-Idle / emotion:
-
-```c
-int16_t emotion_rest[EMOTION_COUNT][PART_COUNT][3];  // Q8, ~200 B
-```
-
-Kit later: `uint8_t part_ids[PART_COUNT]` in RTC. Each id selects a mesh for that slot. Same 6-wide arrays.
+Skinning is **not** on Core 0. Core 1, per triangle, blends the two bone matrices onto each of the three vertices, then clips and fills. No deformed vertex buffer.
 
 ---
 
-## 7. Clips: animation writes rest, not pos
+## 7. Clips: animation writes bone locals
 
-A wave (hand up) is a **moving magnet**. The spring is the metal. The mesh is bind-pose metal aimed at the mass.
+A wave is a **bone-local rotation** on the arm. The mesh deforms because vertices share that bone and a neighbor. The core spring is separate: a clip may also move `core.rest`.
 
 ```
-clip.sample(t)  →  rest[]  →  spring  →  pos[]  →  hitbox
-                                      └───────→  aim(mesh) + raster(lod, light)
+clip.sample(t) → bone local → FK → pose.bone[]
+core.rest      → spring     → pose.core
 ```
 
 ```c
 typedef struct {
     uint8_t  id;
-    uint8_t  part_mask;     // bit i set → this part has a track
+    uint8_t  bone_mask;
     uint8_t  frame_count;   // 6–10
     uint8_t  fps;           // 15 is enough
     uint16_t duration_ms;
-    uint8_t  vox_id;        // 0 = silent; patch id, play on clip **start**
+    uint8_t  vox_id;        // 0 = silent; patch id, play on clip start
+    uint8_t  full_frame;    // 1 = camera may move; all rows dirty
 } ClipHdr;
 
-// Packed after header, only masked parts:
-// int16_t rest_xyz[frame_count][popcount(mask)][3];
-// int16_t tip_xyz [frame_count][popcount(mask)][3];  // optional
+// Packed after header, only masked bones:
+// int16 quat xyzw + optional int16 translation, per frame
 ```
 
-Wave, 8 frames, core + arm_r, `int16`×3: **96 bytes** of rest. Tips double that. **No extra clip meshes.** The raised arm is the idle arm mesh aimed at a risen mass.
+A wave of 8 frames on core + arm is a few hundred bytes, not a posed sheet.
 
-Playback: `u = t * fps`, lerp two keys, Q8 → float, write `rest[p]`. Missing mask bits keep last emotion rest.
+Playback: `u = t * fps`, lerp keys, write `local_q` / `local_t`. Missing mask bits keep the bind local. Then FK.
 
-**Contract:** exporter samples the armature at frame *f* into `rest` (and tip). Meshes stay bind-pose. One pose encoding on chip: the springs. Do not ship a posed sheet per clip frame.
+**Gaze:** additive local rotation on `BONE_HEAD` after the clip sample. S rooms. Do not replace the clip.
 
-**Stiffness:** while a clip is active, raise `k` on masked parts so the hand actually rises. Blend `k` down on clip end. If `k` is too low, you show a dangling mass with a rest-pose mesh aimed at it.
+**Jiggle:** optional one-pole on a bone local after the sample. This is the shake on a leaf or an ear. It is not a spring and it does not collide.
 
-**Gaze:** `rest_head += gaze_offset` after the clip sample. Additive. Do not replace the clip. S rooms.
+**Vox:** if `vox_id != 0`, Core 0 starts that patch on voice B when the clip **starts**.
 
-**Vox:** if `vox_id != 0`, Core 0 starts that patch on voice B when the clip **starts** (including cortex-injected `clip_id`). Lizard does not fire a second trigger. Emotion rest tables never auto-vox. `vox_id == 0` is silent, same as `clip_id == 0`.
-
-**L0 walk-cycle film is out.** Walk is core translation + yaw plus idle rest bob on the combined mesh. L0 eat is **mesh squash** (same hop squash path). L2 legs reuse the idle mesh. Close-up locomotion is still core translation + yaw plus idle bob unless a clip exists. Close-up teeth / Nest dish are **not** v1.
-
-**Blink:** a second closed-eye head mesh, or 2-tri eyelids. Do not smuggle a 64×64 face stamp. L0 skips faces.
+**Blink:** a second set of face weights, or a clip that rotates a lid bone if you add one later. v1 lid is two influences on the eye region of the same mesh, or a clip. Do not smuggle a face stamp. L rooms still have the face; it is just small.
 
 ---
 
@@ -437,23 +385,21 @@ Playback: `u = t * fps`, lerp two keys, Q8 → float, write `rest[p]`. Missing m
 force = (rest - pos) * k - vel * d
 ```
 
-Core: Verlet + world gravity `-Y` (mapped into body space). Limbs: springs to `rest`, no extra gravity (or very little, so arms don’t droop out of the clip).
+That equation is the **core only**. Limbs do not integrate.
 
-**Hitboxes are spheres on `pos` (and optional `tip`). Never sprite alpha. Never mesh triangles.**
+**Hitboxes are spheres on bone joints. Never sprite alpha. Never mesh triangles.**
 
 ```
-hitbox[i].c = world(pos[i])
-hitbox[i].r = radius[i]           // scaled by squish on core
+hitbox[i].c = bone[i].joint
+hitbox[i].r = bone[i].radius
 ```
 
-**Rigid bodies** (toys + knockable props): position, orientation, linear/angular velocity, mass, inertia, collider (sphere or box). Impulse solver at 30 Hz. **Sleep** when `|v|` and `|ω|` stay below epsilon for a few ticks; wake on impulse / shake / poke. Studio overlay: awake count (suggestion 3).
+**Rigid bodies** (toys + props): position, orientation, linear/angular velocity, mass, inertia, collider (sphere or box). Impulse solver on Core 0 at 30 Hz. **Sleep** when `|v|` and `|ω|` stay below epsilon; wake on impulse / shake / poke. Cap **24 awake**. Asleep bodies are not copied into the pose while the camera is still.
 
-Hall **bowl:** floor-constrained — slide on `y=0`, yaw free, **no pitch/roll**. Eat photograph beats a physics sandbox.
-
-Nest: **zero** knockable RBs so sleep can GRAM-hold.
+Hall **bowl:** floor-constrained — slide on `y=0`, yaw free, **no pitch/roll**.
 
 ```c
-enum { TOY_N = 3, KNOCK_N = 4 };
+enum { RIGID_N = 24 };
 
 typedef struct {
     float    x, y, z;
@@ -462,51 +408,47 @@ typedef struct {
     float    wx, wy, wz;
     float    mass, inertia;
     uint8_t  shape;      // 0 sphere, 1 box, 2 bowl-slide
-    uint8_t  sleep;      // 1 = frozen
+    uint8_t  sleep;
     uint8_t  mesh_id;
 } Rigid;
 ```
 
-| Pair | S / L2 | L / L0 | Why |
+| Pair | S | L | Why |
 | :--- | :--- | :--- | :--- |
 | Core vs floor / walls | On | On | Locomotion, squish |
-| Core vs scenery AABB | On if scenery | On | walk around furniture |
-| Core vs toys / knockables | On | On | bounce |
-| Toy / knock vs scenery AABB | On if scenery | On | ball under a table |
-| Toy vs knock / toy vs toy | On | On | sandbox |
-| Limb vs toys | **On** (Play) | **Off** | wave bops a ball |
-| Limb / tip vs poke | **On** | **Off** | boop hand vs nose |
-| Limb vs walls / scenery | Off | Off | don’t fight a clip |
-| Limb vs limb | Off | Off | not worth it |
-| Limb vs knockable chair | Off | Off | not worth it |
+| Core vs scenery AABB | On | On | walk around furniture |
+| Core vs rigids | On | On | bounce |
+| Rigid vs scenery AABB | On | On | ball under a table |
+| Rigid vs rigid | On | On | sandbox; this is the expensive pair |
+| Arm joints vs toys | **On** (Play) | **Off** | a wave bops a ball |
+| Joint vs poke | **On** | **Off** | boop |
+| Joint vs walls / scenery | Off | Off | don't fight a clip |
 | FX vs floor `y=0` | On | On | dust / leaves / crumbs land |
 | FX vs scenery / pet / toys | Off | Off | not worth it |
 
-Author clips **inside** the S cube. Collision is not an animation editor. Lizard steers around scenery AABBs in L (no navmesh).
+A heap of stacked boxes is the frame that costs milliseconds. Free bodies against the floor are cheap. If the solve misses a publish, Core 1 holds the last pose.
 
 **Poke**
 
-- **S / L2:** unproject the tap through `inv(proj*view)`, ray vs spheres, closest hit. Floor ray if miss → walk / look there.
-- **L / L0:** **screen-space** pick. Inflate projected AABBs to **≥24 px**. Nearest of pet / toys / props. Miss → floor walk-to.
+- **S:** unproject the tap through `inv(proj*view)`, ray vs joint spheres, closest hit. Floor ray if miss → walk / look there.
+- **L:** **screen-space** pick. Inflate projected AABBs to **≥24 px**. Nearest of pet / toys / props. Miss → floor walk-to.
 
-**Squish:** core penetration → non-uniform scale on core mesh in S (~100 ms recover). L0: squash the combined mesh (also the **eat** photograph). Push a squish patch (voice A) if closing speed beats the threshold.
+**Squish:** core penetration → non-uniform `core.scale` (~100 ms recover). Same path for the Hall eat photograph. Push a squish patch (voice A) if closing speed beats the threshold.
 
-**Shake / flinch:** `imu_evt` / `jerk` impulse on core (+ head in S) and on resident toys **and knockables**. Spawn **dust** at feet (and **leaves** if the room record has a leaf emitter). Springs recover into current `rest`. RBs wake. Core 0 pokes a yelp on voice B (not a clip). Cooldown or a twitchy IMU machine-guns bounce. One SFX per FX burst, not per particle.
+**Shake:** impulse on the core and on awake rigids. Spawn **dust** (and **leaves** if the room has an emitter). A clip may also set `full_frame`. One SFX per FX burst.
 
-**Eat (Hall):** bowl is a **prop** magnet, not a fifth room and not L2-in-L. Floor-constrained RB. When Core 0 requests eat: L0 mesh squash + **crumb** burst at the bowl + **one** patch (`SfxEvt` or mixer poke). *When* is lizard TBD.
+**Eat (Hall):** bowl is a **prop** magnet. When Core 0 requests eat: core squash + **crumb** burst + **one** patch. *When* is lizard TBD.
 
-**Audio from collide:** on impulse, not contact. Closing speed along the normal above a threshold, plus ~150–250 ms cooldown **per pair**, or a rolling core machine-guns the floor. Push `SfxEvt` and return. Floor impulse also spawns **dust**. See §9.
-
-**Door:** core vs door volume → swap `room_id`, load backdrop **and palette** + `light_dir`, spawn on opposite face. Not a physics editor.
+**Door:** core vs door volume → swap `room_id`, load meshes **and palette** + `light_dir`, spawn on the opposite face, `full_frame` once.
 
 ---
 
 ## 9. Audio (procedural, two voices)
 
-**Locked:** v1, on battery. Mixer on Core 0. Two voices. Procedural patches, **no PCM**. ES7210 off. PA gated. Let a live voice **finish** before chip sleep. 8 h is a strive-for, not a gate that kills chirps.
+**Locked:** v1. Mixer on Core 0. Two voices. Procedural patches, **no PCM**. ES7210 off. PA gated. Let a live voice **finish** before chip sleep. 8 h is parked; chirps are not.
 
 ```
-Core 1 collide / squish  →  SfxEvt { id, vel, tag }   // voice A
+Core 0 collide / squish  →  SfxEvt { id, vel, tag }   // voice A
 Core 0 clip start (vox_id), shake/jerk  →  mixer poke  // voice B
 
 Core 0 @ 12 kHz mono, block 256:
@@ -516,11 +458,9 @@ Core 0 @ 12 kHz mono, block 256:
 PA GPIO 7 high only while a voice is live
 ```
 
-**12 kHz, not 24.** This speaker and this look do not need XiaoZhi’s 24 kHz duplex. Confirm with a sine at bring-up; drop to 8 kHz only if the amp/coil is ugly. Steal **pins**, not that audio graph. No MP3, no TF, no AEC.
+**12 kHz, not 24.** Steal **pins**, not that audio graph. No MP3, no TF, no AEC.
 
-**Two voices:** a wave that bops a toy **layers** grunt + bop. A third event of the same class replaces that voice; it does not stack. Last-event-wins inside a class.
-
-**Procedural, not samples.** Patches are PODs. The hot path never reads flash for audio. Mesh XIP stays cheap; stamp/atlas XIP is the scarce pixel resource.
+**Two voices:** a wave that bops a toy **layers** grunt + bop. Last-event-wins inside a class.
 
 ```c
 typedef struct {
@@ -530,25 +470,23 @@ typedef struct {
     uint8_t  flags;
     uint16_t dur_ms;
     uint16_t f0, f1;     // start/end Hz
-    uint8_t  q;          // resonance
-    uint8_t  noise;      // mix
+    uint8_t  q;
+    uint8_t  noise;
     uint8_t  atk, dec;   // Q8 time
     uint8_t  fm_idx;     // 2-op only
-    uint8_t  vel_amt;    // SfxEvt.vel bends f0 / gain
+    uint8_t  vel_amt;
 } SynthPatch;            // 16 bytes
 ```
 
-Voice A: impact patches (floor, wall, ball, furniture bump) — different `f0`/`q`, not four code paths. Voice B: effort / yelp / happy / sleepy. Tuning is data. Idle ambient loops are **off** (they fight PA-gating and sleep).
+Voice A: impact patches. Voice B: effort / yelp / happy / sleepy. Idle ambient loops are **off**.
 
-Collision map: `(pair → patch_id)` in a tiny table. Not art.
+**Sleep:** Core 1 may skip SPI while a tail plays. Do **not** light-sleep or deep-sleep the chip, and do not drop PA, until both voices decay to zero (or a hard cap ~800 ms). Face-down: **do not start** new events; let the current tail end; PA low; then sleep.
 
-**Sleep / GRAM-hold:** Core 1 may skip SPI and WFI while a tail plays. Do **not** light-sleep or deep-sleep the chip, and do not drop PA, until both voices decay to zero (or a hard cap ~800 ms). Face-down: **do not start** new events; let the current tail end; PA low; then sleep.
+**Codec:** lazy-init ES8311 on first sound; **standby** between phrases. Volume **fixed** in v1. PLUS is not volume.
 
-**Codec:** lazy-init ES8311 on first sound; **standby** between phrases (re-init is tens of ms — a wall hit would miss). Full off only on deep sleep. Volume **fixed** in v1 (studio may be louder, like backlight). PLUS is not volume.
+**Speaker:** MX1.25 header. Confirm when the board arrives.
 
-**Speaker:** MX1.25 header. Confirm when the board arrives. Bring-up is I2C ACK + PA pulse + sine; open header is not a missing driver.
-
-**Mic / ES7210:** later. Not initialized. DIN pin unused.
+**Mic / ES7210:** later. Not initialized.
 
 ---
 
@@ -556,204 +494,143 @@ Collision map: `(pair → patch_id)` in a tiny table. Not art.
 
 ### Room
 
-One authored VP per room. Draw order:
+One authored VP per room, unless a clip has set `full_frame`. Draw order, far to near:
 
 ```
-restore backdrop          // dirty window, PSRAM → DRAM fb
-blit shadow               // floor stamp at project(core on y=0); both LODs
-raster occluders + pet + toys + knockables   // painter's; N·L at tri setup
-blit FX                   // dust / crumbs / leaves stamps; no alpha; on top
+sky bands + slab + static props     // live triangles
+skinned pet + rigid meshes          // skin at triangle setup, then the same filler
+shadow stamp                        // floor, at the projected core on y=0
+FX stamps                           // dust / crumbs / leaves; no alpha; on top
 ```
 
-**Do not re-raster the backdrop from a moving VP.** Scenery is pixels in the 240×240 indexed photograph. The L0 mesh does **not** contain the puddle — that is how an L0 speck walks behind a plant and the shadow stays on the boards.
+**There is no backdrop photograph.** A still camera may reuse screen-space triangles for static meshes. That cache is an optimization. It must match a redraw. The moment the camera moves, drop it and set every row.
 
-Knockables and occluders are omitted from the bake (hole or contact shadow only).
+**Palette:** copy the room's 256 RGB565 entries on the door. Index 0 = key. **1–63** = actor ramps. **64–255** = this room. Scanout uses that one table.
 
-**Occluders** are static meshes, same list in S and L (cap 12 objects, **~200 tris total**). Sort key is view-space z (still called Y-sort). A knockable pot is a **different** object from a walk-behind plant.
+**Light:** `room.light_dir` world-space unit. At **triangle setup** (after skinning, not in the pixel loop): `band = quantize(N·L, 3)` → write `mat.ramp[band]`. No textures. No Gouraud. No per-pixel N·L.
 
-- **L:** depth-sort L0 mesh + occluders + toys + knockables.
-- **S:** baked part order per yaw stays (`draw_order[4][PART_COUNT]`). Occluders vs **core**: behind the whole pet, or `cover_body` (Nest blanket) = after non-head parts. **`PART_HEAD` always last** among pet meshes. Do **not** pos-sort all six parts.
-
-**Palette:** copy the room’s 32 RGB565 entries on the door cut (with the backdrop). Index 0 = key. Scanout uses that one table. Actor materials in **1–15** are **ramps** of 2–3 consecutive indices (shadow / mid / lit). Scenery **16–31** belong to the backdrop.
-
-**Light:** `room.light_dir` world-space unit. At **triangle setup** (not in the pixel loop): `band = quantize(N·L, 3)` → write `mat.ramp[band]`. No textures. No Gouraud. No per-pixel N·L.
+**Smooth skin** bends elbows. That is a softer silhouette than rigid parts. It is the chosen look. It does not add a texture or a gradient inside a triangle: the triangle is still one flat index.
 
 ### Pet
 
-Rigid bind-pose meshes. Continuous yaw. One `view_idx` (0..3) for **painter's order**, not for choosing a photo.
-
 ```c
 typedef struct {
-    uint16_t vtx_off;    // packed xyz + mat_id
-    uint16_t idx_off;    // uint16 tris
+    uint16_t vtx_off;    // xyz + mat_id + two bone ids + two weights
+    uint16_t idx_off;
     uint16_t n_vtx;
     uint16_t n_tri;
 } MeshRec;
 
 typedef struct {
-    uint8_t ramp[3];     // shadow, mid, lit — indices in 1–15
+    uint8_t ramp[3];     // shadow, mid, lit — indices in 1–63
 } MatRamp;
 
 typedef struct {
     uint32_t pix_off;
     uint16_t w, h;
-    int16_t  hot_x, hot_y;   // pivot; shadow = feet, FX = centre
-} SpriteRec;                 // stamps only (shadow + FX)
+    int16_t  hot_x, hot_y;
+} SpriteRec;             // stamps only (shadow + FX)
 ```
 
-Raster one triangle at a time (clip + project + scanline into the dirty window). No big transformed vertex buffer. Inner loop writes a palette index.
+Raster one triangle at a time. For a skinned triangle, blend two bone 3×4s onto each vertex, then clip and fill. The filler writes a palette index. It does not see floats.
 
-L2: 6 part `MeshRec`s. Pivot / origin = attach. Aim as §6.
-
-L0: one combined `MeshRec` at the projected core, **separate** drop-shadow stamp on the floor, optional squash on bounce or eat. Do not downscale L2 meshes live. Do not bake the shadow into the L0 mesh.
-
-Eyes: blink mesh or 2-tri lids parented to `PART_HEAD`. L0 skips faces.
-
-Toys / knockables: one mesh each. Play sphere toys are a 12–24 tri mesh, not a special-case disk raster.
-
-**Triangle budget (dynamics, per frame)**
+**Triangle budget (visible, per frame)**
 
 | Set | Tris |
 | :--- | ---: |
-| L2 pet | 6 × 24–40 → **144–240** |
-| L0 pet | **40–80** |
-| Toys | 3 × 12–24 → **36–72** |
-| Knockables | ≤4 × 20–40 → **80–160** |
-| Occluders | cap 12 objects, **~200 total** |
+| Room shell + props | a few hundred |
+| Pet | a few hundred vertices, well under ~200 tris |
+| Awake rigids | the rest, up to the cap |
+| **Cap** | **~1024** |
 
-Worst S frame ~500 tris. Fill is the dirty AABB (~120×140 × ~2× painter overdraw), not the triangle count. Budget **~1–2.5 ms** raster in S, **&lt;1 ms** in L. N·L at setup keeps the inner loop in the 8–20 cycle/px band.
+Fill, not the count, is the wall. A still S window (~120×140, ~2× overdraw) is about 1–2.5 ms. A `full_frame` clip at ~2× over the whole glass is about 4–10 ms and overlaps the 23 ms wire at 40 MHz. ~4× overdraw on a moving camera is the frame that misses 30 Hz. Measure it. If it misses, lower the **single** period. Do not add a second cadence.
 
 ### FX
 
-Not a GPU. DRAM SoA. World space. Gravity `-Y`. Die on `life`. No particle–particle, no scenery AABB, no pet hitboxes. **Stamps** in v1 (8×8 / 16×16). Leaves as 2-tri cards are a later upgrade.
+Stamps, not cards. DRAM SoA. World space. Gravity `-Y`. Die on `life`. No particle–particle. Floor only.
 
 ```c
-enum { FX_N = 64 };
+enum { FX_N = 256 };
 
 typedef struct {
     float   x[FX_N], y[FX_N], z[FX_N];
     float   vx[FX_N], vy[FX_N], vz[FX_N];
-    uint8_t life[FX_N];   // ticks left
+    uint8_t life[FX_N];
     uint8_t kind[FX_N];   // 0 dust, 1 crumbs, 2 leaves
-    uint8_t pal[FX_N];    // index in 1–15, or stamp id
+    uint8_t pal[FX_N];
 } FxPool;
 ```
 
-Stamps: 4–8 types, 8×8 or 16×16, indices in 1–15. Fade = dimmer index or smaller stamp, then free.
+Spawn: shake → dust (leaves if the room has an emitter); floor impulse → dust; eat → crumbs. One `SfxEvt` per burst.
 
-Spawn (engine, not personality):
+`fx_live` = any `life[i] != 0`. An empty mask needs a matching pose: camera still, bones still, rigids sleeping, `fx_live==0`.
 
-| Hook | Kind |
-| :--- | :--- |
-| Shake | dust at feet; **leaves** if the room record has an emitter (Yard) |
-| Floor impulse | dust |
-| Eat at bowl | crumbs |
-
-One `SfxEvt` / mixer poke per burst. Project with the room VP. Draw after meshes.
-
-`fx_live` = any `life[i] != 0`. GRAM-hold requires it false **and** all RBs sleeping.
-
-**Dirty rect:** union of projected moving AABBs (meshes + shadow + FX) + margin. ST7789 `CASET`/`RASET`. S: 120×140 RGB565 ≈ 7 ms @ 40 MHz (~3.5 ms @ 80). L: 32×48 ≈ 1–2 ms idle; FX scatter may fatten. USB/studio may **full-frame while `fx_live`**. Door cut: full 240×240 ≈ 23 ms once. Battery: still dirty-union and hold after the burst.
+**Dirty rows:** union of projected moving AABBs, one bit per row. `full_frame` sets all 240. ST7789 `CASET`/`RASET` per band. Door and `full_frame` clips: full 240×240 ≈ 23 ms at 40 MHz, ≈ 11.5 ms at 80 MHz. Tearing is accepted (no TE pin).
 
 **Budget (30 Hz, 40 MHz SPI)**
 
-| Slice | S / L2 | L / L0 | Door cut |
-| :--- | ---: | ---: | ---: |
-| Clip + springs + RBs + AABBs + FX | < 0.8 ms | < 1.2 ms | same |
-| Restore dirty from backdrop | ~0.2 ms | trivial | full blit once |
-| Mesh raster + stamps | ~1–2.5 ms | < 1 ms | — |
-| SPI DMA | **7–12 ms** | **1–3 ms** (full if USB+FX) | **~23 ms** |
-| Slack → WFI | rest | rest | drop 1 frame |
+| Slice | Still camera | `full_frame` clip |
+| :--- | ---: | ---: |
+| Core spring + FK + rigids + FX (Core 0) | 1–4 ms typical; a stacked heap can be more | same; a miss holds the pose |
+| Skin + raster (Core 1) | dirty window, ~1–3 ms | ~4–10 ms at ~2× |
+| SPI DMA | dirty rows | **~23 ms**, overlapped with the filler |
+| Slack | wait for the deadline | the wire is the long pole |
 
-No runtime sprite scale. L2 vs L0 is two authored meshes. Mesh squash / RB size is authored.
-
-`board-sim` never rasterizes a cube. The mesh rasterizer lives in `firmware/` and shows up as ST7789 GRAM pixels.
+`board-sim` never rasterizes a habitat. The rasterizer lives in `firmware/` and shows up as ST7789 GRAM pixels.
 
 ---
 
 ## 11. Asset pipeline (PC)
 
-Blender: low poly, hard edges, 16–32 colors, 6-bone armature. Origin of each part mesh at the attach. Vertex (or face) **material id**, not a photo.
+Blender: low poly, hard edges, flat faces, 6-bone armature. Vertex material id. Each vertex: two bone indices and two weights. Weights sum to 1. Zero the second weight for a rigid vertex.
 
-**Room bake:** one authored camera (elev ~40°, azimuth = `room.front`, same FOV as runtime). Render or paint the **240×240 indexed backdrop** with knockables and occluders **omitted** (hole or contact shadow). Store `light_dir`. Store the 4 unit XZ headings in the blob for `yaw_quad` **draw-order** only — they are not pet bake cameras.
+**Room:** meshes, not a render. Sky quads, a slab of a few triangles, props as their own meshes. Store `light_dir` and the 256-entry palette. Authored darker faces under static props. Do not paint a 240×240 photograph.
 
-**Pet export (once per mesh, not per yaw, not per clip frame):**
+**Pet export:**
 
-1. Armature at bind / idle.
-2. L2: for each part, export the bind-pose mesh, origin = attach, `mat_id` per vertex or face. L0: one combined mesh, origin = feet.
-3. **Shadow** is a separate floor stamp (S size and L size), not in the L0 mesh.
-4. Clip frames: sample bone local translation → `rest` (and tip) `int16` **once per frame**. Do **not** export a mesh per frame.
-5. Blink: closed-eye head mesh or 2-tri lids.
+1. Armature at bind.
+2. One mesh, origin at the core, two influences max.
+3. **Shadow** is a separate floor stamp.
+4. Clip frames: bone-local rotation (and optional translation) `int16`, once per frame. Do not export a mesh per frame.
+5. `full_frame` on the clip header if that clip moves the camera.
 
-**Pixel format:** indexed-8 framebuffer and stamps. Color 0 = key. **Per-room** `palette[32]` RGB565, copied to DRAM on door. **1–15** = actor ramps (2–3 consecutive shades per material, stable across rooms). **16–31** = scenery in the backdrop. Do not bake a second 240×240 for night.
+**Exporter must fail** if a vertex has more than two influences, if a material ramp uses indices outside 1–63, or if a room's visible set exceeds ~1024 triangles.
 
-**Size discipline**
-
-| Content | Indexed / mesh | Fits? |
-| :--- | :--- | :--- |
-| L2 idle 6 meshes | ~2–4 KB | Trivial |
-| L0 combined | ~1–2 KB | Trivial |
-| L2 wave rest (core + arm_r) | 96 B | Yes |
-| L2 wave as posed sheets | ~256 KB–2.5 MB | **Do not** |
-| 4 backdrops 240×240 | 230 KB | Yes |
-| + 6 emotion poses as extra meshes | waste | Prefer rest-only + bind mesh |
-
-**Clip list and what plays when: TBD** (lizard brain). The pak format allows sparse clips; first art = L2 idle meshes + L0 combined + 4 backdrops + palettes + ramps + shadow/FX stamps. Extra emotions/wave/munch are data, not engine work. Clips that should grunt set `vox_id`; idle/emotion tables do not. Hall eat is a Core 0 munch request (squash + crumbs), not a Nest L2 clip.
-
-Rooms in the pak: id, size (S/L), lod, front, view/proj (or look_at params), `light_dir`, backdrop off, **`palette[32]`**, scenery AABBs, props (magnet and/or knockable + `shape`), doors, occluders (`cover_body` flag + `mesh_id`), toy slots, optional leaf **emitter** (pos + count), `draw_order[4][PART_COUNT]`.
-
-Exporter emits one `.pak`: yaw headings (draw-order), rooms (incl. palettes + light), clips (`ClipHdr` includes `vox_id`), `MeshRec`s + verts/indices, `MatRamp[]`, shadow recs, FX stamps, backdrops, then audio:
+Rooms in the pak: id, size (S/L), front, view/proj, `light_dir`, `palette[256]`, scenery AABBs, props, doors, mesh ids, toy slots, optional leaf emitter.
 
 ```
-patch_count, SynthPatch[patch_count]   // ~16 × N; copy to DRAM at boot
-pcm_count = 0                          // reserved; v1 is procedural
-pcm_index[]                            // empty
+patch_count, SynthPatch[patch_count]
+pcm_count = 0
 ```
-
-Custom packer. Runtime never sees a wav. If patches fail later:
-
-```c
-typedef struct {
-    uint32_t off;
-    uint16_t n_samples;
-    uint8_t  rate_div;   // 1 = 12 kHz, 2 = 6 kHz
-    uint8_t  fmt;        // 0 = s8, 1 = ima4
-} PcmRec;
-```
-
-Stream 256 frames into the existing voice. Do not decode MP3. Do not use the TF slot.
-
-**Exporter must fail** if a material ramp uses indices outside 1–15, if an occluder set exceeds ~200 tris, or if a knockable is painted into a backdrop (authoring check: those mesh ids must be in the dynamic list).
 
 ---
 
 ## 12. Lizard brain — **behaviour TBD**
 
-The toy must run with the radio off. **What it does** (when it wanders, waves, sleeps, thinks) is not locked yet. Do not invent a personality in the engine.
+The toy must run with the radio off. **What it does** is not locked yet.
 
-**Machinery that is locked** (so behaviour can be data later):
+**Machinery that is locked:**
 
-- `emotion_rest[]` and clip tracks can drive `rest[]`
-- Core 0 may set `clip_id` / `emotion` / `walk_x/z` / `room_id` in the snapshot; Core 1 only samples, blends, and collides
+- Bone clips and `core.rest` can drive the pose
+- Core 0 owns the sim and may set `clip_id` / `emotion` / `walk_x/z` / `room_id` before it publishes
 - Hunger/happy **storage** in RTC exists; decay rates TBD
-- Nest S: close-up clips and poke spheres. No knockable RBs
-- Play S: 1–3 toy RBs; limb vs toy; toy vs scenery AABB if a chair exists; optional 1 knockable chair
-- Hall / Yard L: pick a free 8×8 cell, steer around scenery AABBs; **≤3** toy RBs; toy vs scenery AABB
-- Bowl in Hall is an eat **prop** magnet and a floor-constrained RB, not a fifth room. Core 0 may request **L0 munch** (squash + crumb FX + one patch). No L2-in-L. Nest dish is not v1
-- Door volume → swap room (backdrop + palette + `light_dir`)
-- Shake is a physics impulse — keep that hook even if the *when* is TBD. Core 0 also pokes voice B (yelp). Core 1 spawns **dust** (and **leaves** if the room has an emitter) and wakes RBs
-- Floor impulse may spawn dust
-- Gaze offset on `rest_head` is an optional hook (S), not a requirement
-- `ClipHdr.vox_id` plays on clip start; lizard does not own a parallel vox trigger. `vox_id == 0` is silent
-- `collide()` may push `SfxEvt`; threshold/cooldown are engine, not personality
+- Nest S: close-up clips and joint poke. Content stays quiet
+- Play S: toys; arm joints vs toys
+- Hall / Yard L: steer around scenery AABBs; rigids from the shared cap of 24 awake
+- Bowl in Hall is an eat **prop** and a floor-constrained rigid. Core 0 may request squash + crumbs. No Kitchen
+- Door volume → swap room (meshes + palette + `light_dir`)
+- Shake is a core impulse plus dust (leaves if the room has an emitter). A clip may add `full_frame`
+- Gaze offset on the head bone is an optional hook (S)
+- `ClipHdr.vox_id` plays on clip start
+- `collide()` may push `SfxEvt`
 
-No locked mapping of poke → wave, PLUS → clip, or cortex `action` → pose. Cortex `clip_id` / `emotion` fields stay in the packet as an inbox; ignore `clip_id == 0`. A cortex `clip_id` with a non-zero `vox_id` on that clip still grunts — that is clip data, not a new cortex field. `target_x/z` is in the current room.
+No locked mapping of poke → wave, PLUS → clip, or cortex `action` → pose. Cortex `clip_id` / `emotion` stay in the packet. `target_x/z` is in the current room.
 
 ---
 
 ## 13. Optional cortex (Wi-Fi is a mode)
 
-Radio **off** on battery by default. STA when USB-powered or a persisted “brain” flag and a known AP. No reconnect spin. Failure → lizard.
+Radio **off** by default. STA when USB-powered or a persisted "brain" flag and a known AP. No reconnect spin. Failure → lizard.
 
 No JSON, no HTTP in the frame path. UDP, little-endian, LAN, port 8888.
 
@@ -796,23 +673,23 @@ If/when a think pose exists: set it **immediately** on a cortex-worthy event so 
 
 ---
 
-## 14. Power (~8 h, strive)
+## 14. Power (8 h parked)
 
-1000 mAh / 8 h ≈ **125 mA average.** Strive for it. Chirps on battery are in. Idle I2S is not.
+1000 mAh / 8 h ≈ **125 mA average.** That target is **not** a lock this pass. The frame period is.
 
-Habitat idle is the easy case: tiny dirty rect, IMU at event rate, GRAM-hold when springs settle, RBs sleep, and **`fx_live==0`**. Close-up play matches old pet-sized SPI. Door cuts are rare full frames. USB may full-frame while FX live; that is studio, not the 8 h path.
+A still pose skips SPI because a full frame is 23 ms at 40 MHz, not because of the battery. `full_frame` clips and doors pay the full ship on purpose. Chirps stay. Idle I2S stays off.
 
-| Lever | Default |
-| :--- | :--- |
-| Backlight PWM | ~30–40% battery; higher on USB; bump on poke, decay |
-| ST7789 | Dirty only |
-| CPU | 240 MHz interacting; 80/160 after a few seconds still |
-| Slack | Core 1 WFI per frame. Chip light-sleep **only if mixer idle** |
-| Wi-Fi | Off unless cortex |
-| Audio | PA + I2S clocks only while a voice is live. ES7210 off. SD off |
-| Deep sleep | Face-down, PWR, long idle — **finish the tail**, PA low, then RTC restore |
+| Lever | Now | Later, if 8 h returns |
+| :--- | :--- | :--- |
+| ST7789 | Dirty rows; empty mask when the pose matches | same |
+| CPU | 240 MHz while a frame has work; wait out the rest of the 33 ms | 80/160 after a few seconds still |
+| Slack | Core 1 waits for the deadline | light-sleep only if the mixer is idle |
+| Wi-Fi | Off unless cortex | same |
+| Audio | PA + I2S clocks only while a voice is live | same |
+| Backlight | On for bring-up | ~30–40% on battery |
+| Deep sleep | Face-down and PWR still need a finished audio tail | same |
 
-USB in = **studio mode** (bright, 30 FPS, no light-sleep, cortex allowed, audio may be louder). Unplug = battery personality. Always hold `BAT_EN`. PWR long-press = latch off.
+USB in = **studio mode** (bright, 30 FPS, cortex allowed). Unplug does not change the raster. Always hold `BAT_EN`. PWR long-press = latch off.
 
 ---
 
@@ -820,18 +697,18 @@ USB in = **studio mode** (bright, 30 FPS, no light-sleep, cortex allowed, audio 
 
 ESP-IDF ≥ 5.5. C++ as a better C: `-fno-exceptions -fno-rtti`.
 
-Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). `esp_lcd` ST7789 + GDMA. Own `CASET`/`RASET`. IMU = I2C FIFO + filter. CST816 on INT. I2S TX to ES8311. Steal Waveshare **pins only**, not LVGL/XiaoZhi (not the 24 kHz duplex/AEC stack).
+Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). The raster track there is the filler and the pose mailbox. `esp_lcd` ST7789 + GDMA. Own `CASET`/`RASET`. IMU = I2C FIFO + filter. CST816 on INT. I2S TX to ES8311. Steal Waveshare **pins only**, not LVGL/XiaoZhi.
 
 **Bring-up order**
 
 1. `BAT_EN`, USB-CDC, octal PSRAM 80 MHz.
 2. Backlight + full-screen fill. Print SPI microseconds (40 vs 80). Prefer 80 if the glass is clean.
-3. Indexed FB + dirty-rect dummy sprite (stamp path).
-4. Complementary filter → gravity / face-down / `jerk`. **Authored Nest backdrop**, Earth-up. **Product test:** tilt does **not** orbit; shake hops the debug mass.
-5. One L2 part **mesh**, continuous yaw, raster at `project(pos)` with N·L bands. Room stays put. `view_idx` may drive a debug overlay / later draw-order — it does **not** pick a photo.
-6. Six springs + one idle rest. Sphere poke (S). Play toy RBs. L0 combined mesh in a dummy Hall. Door cut Nest ↔ Hall.
-7. Battery idle / GRAM-hold (springs settled, RBs sleeping, `fx_live==0`). Studio vs battery backlight. Studio overlay: awake RB count.
-8. Audio: ES8311 I2C, PA pulse, 12 kHz sine, PA low. Speaker TBD (MX1.25). Then one impact patch from a debug poke; `collide()` → `SfxEvt` (floor, then toy); one clip with `vox_id` plus a toy hit (two voices). GRAM-hold while a tail finishes; confirm PA drops; face-down waits for mixer idle.
+3. One indexed FB + two DMA bands + dirty rows. An empty mask does not call SPI.
+4. Complementary filter → gravity / face-down / `jerk`. **Live Nest slab** (a few triangles, not a photograph), Earth-up. **Product test:** tilt does **not** orbit; shake hops the debug core.
+5. One weighted mesh, six bones, two influences, flat N·L. A debug clip turns a bone. The room stays put.
+6. Core spring + FK. Joint poke (S). A few rigid toys. Door cut Nest ↔ Hall, `full_frame` once.
+7. Pose mailbox: Core 0 publishes, Core 1 interpolates. A hitching sim does not move the deadline. Empty mask when the pose matches.
+8. Audio: ES8311 I2C, PA pulse, 12 kHz sine, PA low. Then `collide()` → `SfxEvt`; one clip with `vox_id`. Tail finishes; PA drops; face-down waits for mixer idle.
 9. UDP cortex last (inbox only). Lizard-brain policy later.
 
 ---
@@ -842,71 +719,61 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 - [ ] `BAT_EN`; PWR latch; VBAT
 - [ ] Octal PSRAM 80 MHz; quad flash 80 MHz
 - [ ] Cube world-up; pet on `Y=0`; no lean with the glass
-- [ ] Camera is room-authored; tilt does not orbit
-- [ ] Shake hops; cooldown; dust FX; GRAM-hold when still (`fx_live==0` **and** RBs sleeping)
-- [ ] Bake FOV / elevation shared for **backdrops**; pet meshes are bind-pose, not 4-yaw photos
-- [ ] `view_idx` 0..3 hysteresis is **painter's order** only; L2 6 parts / L0 combined by `room.lod`
-- [ ] Indexed FB; color 0 = key; **per-room palette** (1–15 actor ramps / 16–31 scenery); load on door
-- [ ] Resident backdrop in PSRAM; dirty restore; door full-frame once
-- [ ] Shadow is a floor stamp, both LODs; not baked into the L0 mesh
-- [ ] Occluder meshes ≤12 / ~200 tris; L depth-sort with pet/toys/knock; S `cover_body` + head last
-- [ ] N·L at triangle setup; one `light_dir` per room; no textures, no z-buffer
-- [ ] When a clip exists: bind-pose mesh + `rest` track + spring lag; no posed sheets
-- [ ] S poke hits spheres; L pick is screen-space ≥24 px
-- [ ] Dirty-rect 30 FPS; GRAM holds when idle; USB may full-frame while FX live
-- [ ] Hall eat = L0 squash + crumbs + one patch; bowl does not flip; no Kitchen; no L2-in-L
-- [ ] `FxPool` 64; dust/crumbs/leaves stamps; floor only; one SFX per burst
-- [ ] Toy + knockable RBs vs scenery AABB; ≤3 toys; ≤4 knockables; Nest knockables = 0
+- [ ] Camera is room-authored; tilt does not orbit; `full_frame` is a clip flag
+- [ ] One indexed FB; two DMA bands; palette 256; 0 = key; 1–63 actor ramps; 64–255 room
+- [ ] No backdrop photograph; sky is quads; floor is a few large triangles
+- [ ] Six-bone smooth skin, two influences; skin at triangle setup; core is the only spring
+- [ ] Pose mailbox, three slots; Core 1 interpolates to the deadline; a stall holds the last pose
+- [ ] Visible triangles ≤ ~1024; scratch stays internal
+- [ ] Shadow is a floor stamp; N·L at setup; no textures, no z-buffer
+- [ ] Awake rigids ≤ 24; bowl does not flip; Nest content stays quiet
+- [ ] `FxPool` 256 stamps; dust/crumbs/leaves; floor only; one SFX per burst
+- [ ] Empty mask when the pose matches; `full_frame` ships all 240 rows
+- [ ] Hall eat = core squash + crumbs + one patch; no Kitchen
 - [ ] ES8311 I2C; PA gated; 12 kHz sine; ES7210 off
-- [ ] `SfxEvt` from collide (threshold + cooldown); two voices (impact + clip `vox_id`)
-- [ ] Tail finishes; PA low; then light-sleep / face-down
+- [ ] `SfxEvt` from collide; two voices; tail finishes before sleep
 - [ ] Wi-Fi off: toy is whole
-- [ ] ~8 h dim, radio off (measure; strive)
-- [ ] Mesh rasterizer is firmware; `board-sim` never rasterizes a cube
+- [ ] 8 h is parked, not a gate
+- [ ] Rasterizer is firmware; `board-sim` never rasterizes a habitat
 
 ---
 
 ## 17. Suggestions
 
-1. Pet yaw is continuous — there is no sheet pop to “fix.” Never IMU-orbit the camera. `view_idx` hysteresis is only for painter's order.
-2. **GRAM-hold** is springs settled, RBs sleeping, and `fx_live==0`, not `|Δq|`. Plot bounce events in studio so shake cannot 30 Hz forever. Overlay awake-body count; a jittering chair kills the 8 h path.
-3. **Bake a debug overlay:** room id, lod, view index (order), clip, frame, awake RBs, `CCOUNT` of raster. Studio mode only.
-4. **Blink** = closed-eye head mesh or 2-tri lids. Do not smuggle a 64×64 face stamp. L0 has no face.
-5. **Tip spheres only on arms** when Play toys exist. Until then one sphere per part in S.
-6. **Palette 32**, color 0 = key. Per-room table; **1–15 ramps** / 16–31 scenery. Night, if ever: a second 32-entry table or a dim of 16–31 — **do not** spend extra 240×240 backdrops (keep the 8-cap for rooms).
-7. **Exporter must fail** if ramps leave 1–15, occluder tris exceed ~200, or knockables are painted into a backdrop.
-8. **USB = studio**, unplug = battery. No settings menu in v1.
-9. **Compile-time SSID** for your LAN.
-10. When the kit lands: swap part meshes, keep clips that only touch attach points (wave still works if the new arm’s origin is the shoulder).
-11. **Gate PA and I2S** even though 8 h is not a hard cap. Silence with MCLK running is the audio version of a static 30 Hz SPI.
-12. If procedural thuds disappoint: fill the pak `pcm` appendix (s8 or ima4 @ 12 kHz) into the **same** voice. Do not add MP3 or the TF slot.
-13. Optional later: ≤3° IMU parallax on wall layers. **v1 = 0°.**
-14. When a leaf or crumb **settles**, stamp it into the PSRAM backdrop and free the FX slot. Litter dies on door reload. Not v1 (raster inner loop still never touches PSRAM).
-15. **2–4 ambient occluder springs** (Hall plant, Yard flower). USB may never settle; battery freezes them so GRAM-hold still works.
-16. Nest dish / L2 meal: later. Hall L0 munch is the v1 eat photograph.
-17. Window-scissor clouds: skip.
-18. **N·L at setup, not in the pixel loop.** Flat bands are the look and the budget.
-19. **Leaves as 2-tri cards** can wait; dust/crumbs as stamps are the right v1.
-20. **Try 80 MHz SPI** on silicon before designing around 40. Extra ~11 ms of slack is how ambitious overdraw stays fun.
-21. **Bowl does not flip.** Eat photograph > physics sandbox in Hall.
+1. Never IMU-orbit the camera. A shake that should move the glass is a `full_frame` clip, not `q`.
+2. **Empty mask** is "pose matches," not `|Δq|`. Overlay awake-body count. A jittering prop keeps the mask hot.
+3. **Debug overlay:** room id, clip, frame, awake rigids, `full_frame`, `CCOUNT` of raster. Studio only.
+4. **Blink** stays on the skinned mesh. Do not add a face stamp.
+5. **Palette 256**, with actor ramps reserved in 1–63, so a night cap keeps its red.
+6. **Exporter fails** on a third influence, a ramp outside 1–63, or a room over ~1024 tris.
+7. **USB = studio**, unplug = same raster. No settings menu in v1.
+8. **Compile-time SSID** for your LAN.
+9. A later kit swaps the weighted mesh and keeps the six bones, so a wave clip still addresses the arm.
+10. **Gate PA and I2S.** Silence with MCLK running is the audio version of a static 30 Hz SPI.
+11. If procedural thuds disappoint: s8 or ima4 at 12 kHz into the **same** voice. Do not add MP3 or the TF slot.
+12. Optional later: ≤3° IMU parallax. **v1 = 0.** That parallax would be `full_frame` every tick. Do not turn it on casually.
+13. **N·L at setup, not in the pixel loop.** Flat bands are the look and the budget. Index-Gouraud stays parked.
+14. **Leaves as 2-tri cards** can wait. Stamps are v1.
+15. **Try 80 MHz SPI** on silicon before designing around 40.
+16. **Bowl does not flip.**
+17. If a `full_frame` heap of rigids misses 30 Hz, lower the single period. Do not add a second clock.
 
 ---
 
 ## 18. Open questions
 
-**Locked this pass:** room-authored camera. S/L only. Nest / Play / Hall / Yard. L2 6 part meshes vs L0 combined mesh as a room field. IMU = sparse bounce. Indexed-8. **Per-room palettes** with **1–15 actor ramps** / 16–31 scenery. Hybrid raster (baked backdrop + live rigid meshes, N·L bands, painter's). Floor **shadow** stamp. Occluder meshes in S and L (≤12 / ~200 tris; `cover_body` + head last). Toys **3** RBs; knockable props **≤4** (Nest 0); Hall bowl slide+yaw. Hall eat = **L0 munch** + crumbs. Event **FX** 64 stamps (dust/crumbs/leaves). Audio = Core 0 2-voice procedural mixer, `vox_id` on clips, `SfxEvt` from collide, ES7210 off. Lizard-brain *when* = later; spatial hooks exist.
+**Locked this pass:** live flat room, no photograph. Room-authored camera, `full_frame` only on a clip. Nest / Play / Hall / Yard. One six-bone smooth skin, two influences, core spring only. Pose mailbox: Core 0 simulates, Core 1 presents. Indexed-8, one framebuffer, two DMA bands, palette 256 (1–63 actor / 64–255 room). Awake rigids **24**. FX **256** stamps. 8 h parked. Audio unchanged in kind. Lizard-brain *when* = later.
 
 1. **PLUS / double-tap** — call pet, send to Nest, ignore? TBD with the brain. Not volume. Not camera recenter.
-2. **Play vs Nest** — two S rooms is locked for v1; could collapse to one S with toys later. Do not invent a fifth room.
-3. **Orthonormalize `up`** — leftover for gravity / face-down debug overlays only, not the window. Compile-time switch if you draw a debug horizon.
-4. **Part layer order (S).** Baked `draw_order[4][PART_COUNT]` per yaw is **locked** for parts. Occluders vs core, or `cover_body` before head. Do not pos-sort all six parts.
-5. **Lizard brain** — whole policy TBD. Hunger decay, wander, gaze, sleep, think, wave, poke mappings, cortex `action` → pose / room. Eat *when* (bowl magnet is locked).
-6. **Speaker** on MX1.25 — confirm when the board arrives. Open header is not a driver bug.
-7. **Patch tuning** (`f0`, decay, FM index). Machinery is locked; the sounds are data.
-8. **Face-down last frame** — prefer a Nest sleep pose vs freeze whatever room you were in? TBD with the brain. The *frame* is art.
+2. **Play vs Nest** — two S rooms is locked for v1. Do not invent a fifth room.
+3. **Lizard brain** — whole policy TBD. Hunger decay, wander, gaze, sleep, think, wave, poke mappings, cortex `action` → clip / room. Eat *when* (bowl magnet is locked).
+4. **Speaker** on MX1.25 — confirm when the board arrives.
+5. **Patch tuning** (`f0`, decay, FM index). Machinery is locked; the sounds are data.
+6. **Face-down last frame** — Nest sleep pose vs freeze the current room? TBD with the brain.
+7. **How hard a `full_frame` shake may be** — triangle cap and overdraw are locked; the period drops only if silicon misses 33.3 ms.
 
-**Already locked, restated:** pet yaw is continuous; `view_idx` does not pick a photo. Room VP does not spin when the pet yaws. World down is gravity. No Kitchen. No L2-in-L. No follow-cam in L. No 4-yaw pet atlas. No skinned skeleton. No backdrop re-raster from IMU. No knockables in Nest. Bowl does not flip.
+**Already locked, restated:** the room is triangles every frame. The pet is one skinned mesh. World down is gravity. No Kitchen. No follow-cam in L. No 4-yaw atlas. No backdrop. No z-buffer. Bowl does not flip. Wi-Fi stays off unless cortex.
 
 ---
 
-The body is a 30 Hz gravity-locked habitat on this Waveshare. Small rooms are the close-up pet. Large rooms are the house: a floor shadow, plants you walk behind, a bowl you munch at, leaves that fall when you shake. IMU shakes the contents. The creature is six springs that chase authored rests, with rigid bind-pose meshes aimed at those masses and a photograph of the room behind them. Toys and a few props can knock around, then sleep. Impacts thud and clips can chirp; the mixer lives on Core 0. The lizard brain does not need a PC. The cortex is a guest.
+The body is a 30 Hz gravity-locked habitat on this Waveshare. Rooms are live flat dioramas: a slab, a few props, a sky of hard bands. The creature is one smooth skin on six bones, with a spring only in the core, and a floor stamp under its feet. Toys can knock around, then sleep. A clip may shake the camera or push it close; every other frame keeps the room's window. Impacts thud and clips can chirp. The lizard brain does not need a PC. The cortex is a guest.

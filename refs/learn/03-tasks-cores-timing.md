@@ -2,7 +2,7 @@
 
 ← [02 buses](./02-how-chips-talk.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 04 Vectors](./04-vectors-matrices-camera.md) →
 
-**Read:** [architecture 4. Core allocation](../../architecture.md#4-core-allocation) · [architecture 5. Inter-core state](../../architecture.md#5-inter-core-state-seqlock-dram-only) · [guide 02](../guides/02-soc-memory-smp.md) (SMP + memory law)
+**Read:** [architecture 4. Core allocation](../../architecture.md#4-core-allocation) · [architecture 5. Pose mailbox](../../architecture.md#5-pose-mailbox-dram-only) · [guide 02](../guides/02-soc-memory-smp.md) (SMP + memory law)
 
 The ESP32-S3 has **two** [Xtensa](../glossary.md#xtensa) [cores](../glossary.md#core) at up to 240 MHz. [FreeRTOS](../glossary.md#freertos) is the tiny OS that runs your functions as [tasks](../glossary.md#task).
 
@@ -10,7 +10,7 @@ The ESP32-S3 has **two** [Xtensa](../glossary.md#xtensa) [cores](../glossary.md#
 
 When IDF boots, it calls `app_main`. In [firmware/main.c](../../firmware/main.c) the `for (;;)` loop *is* the program: read IMU, fill pixels, `vTaskDelay(33 ms)`.
 
-`vTaskDelay` **blocks**: this task sleeps, other tasks can run. That is fine for a hello world. Architecture Core 1 still sleeps until `t0 + 33.3 ms`, but it must not block waiting for Core 0, Wi-Fi, or I2S.
+`vTaskDelay` **blocks**: this task sleeps, other tasks can run. That is fine for a hello world. Architecture Core 1 waits for an absolute 33.3 ms deadline. It must not block waiting for Core 0, Wi-Fi, or I2S. A stalled sim holds the last pose.
 
 [Tick](../glossary.md#tick): `CONFIG_FREERTOS_HZ=1000` means 1 ms ticks. `pdMS_TO_TICKS(33)` is ~33 ticks.
 
@@ -18,12 +18,12 @@ When IDF boots, it calls `app_main`. In [firmware/main.c](../../firmware/main.c)
 
 | Core | What |
 | :--- | :--- |
-| **0** | [IMU](../glossary.md#imu) 100 Hz, touch [IRQ](../glossary.md#irq), lizard 20 Hz, mixer, backlight, optional Wi-Fi |
-| **1** | One pinned task: snapshot → IMU evt → springs → RBs → raster meshes → dirty SPI → wait for 33.3 ms |
+| **0** | [IMU](../glossary.md#imu) 100 Hz, touch [IRQ](../glossary.md#irq), lizard 20 Hz, **sim** (core spring, bones, rigids, particles), mixer, backlight, optional Wi-Fi |
+| **1** | One pinned task: load pose → interpolate to the deadline → skin + raster → dirty SPI. No physics |
 
 **Golden rule 1:** Core 1 never waits on Core 0, Wi-Fi, or the LLM.
 
-[Pinning](../glossary.md#pinning): `xTaskCreatePinnedToCore(..., 1)` so the body loop never migrates. Priorities: IMU 12, touch 11, mixer 7, housekeeping 5. Wi-Fi (when on) sits high inside IDF. Your tasks stay below that or they starve the radio — and you do not want the radio in the frame path anyway.
+[Pinning](../glossary.md#pinning): `xTaskCreatePinnedToCore(..., 1)` so present never migrates. Priorities: IMU 12, touch 11, mixer 7, **sim 6** (under the mixer), housekeeping 5. Wi-Fi (when on) sits high inside IDF. A long rigid-body solve must not starve I2S.
 
 `board-sim` today: **one thread**. Write the code as if two cores exist. A seqlock still works with one reader and one writer on the same thread; you will feel the split when the sim grows.
 
@@ -43,17 +43,16 @@ That is “deferred work.” Polling the IMU every 33 ms (current `main.c`) is a
 
 | Slice | Time |
 | :--- | :--- |
-| Clip + springs + RBs + yaw `view_idx` | &lt; 0.8 ms |
-| Backdrop restore | small (S) / trivial (L) |
-| Mesh raster + stamps | 0.3–2.5 ms |
-| SPI DMA | ~7–12 ms S dirty; ~1–3 ms L; full frame on door |
-| Slack | [WFI](../glossary.md#wfi) |
+| Core spring + FK + rigids (Core 0) | 1–4 ms typical |
+| Skin + raster (Core 1) | ~1–3 ms dirty; ~4–10 ms full frame |
+| SPI DMA | dirty rows, or ~23 ms when `full_frame` |
+| Slack | wait for the deadline |
 
-Lock with [CCOUNT](../glossary.md#ccount) (CPU cycle counter) or a [GPTimer](../glossary.md#gptimer). If the frame is late, you still must not spin at 240 MHz drawing a static image. Idle → skip SPI ([GRAM](../glossary.md#gram) holds) when springs/toys settled and `fx_live==0`.
+Lock with [CCOUNT](../glossary.md#ccount) or a [GPTimer](../glossary.md#gptimer). The tick is an absolute deadline, not a delay after the work. If the pose matches the last one, the row mask is empty and you skip SPI ([GRAM](../glossary.md#gram) holds). That is the frame period, not an 8 h gate.
 
-## Seqlock (how cores share)
+## Pose mailbox (how cores share)
 
-Core 0 writes a [snapshot](../glossary.md#seqlock) `SharedSnap`. Core 1 copies one coherent slot per tick and never peeks again that frame.
+Core 0 writes a [pose](../../architecture.md#5-pose-mailbox-dram-only): timestamp, camera, six bone matrices, rigid instances. Three slots. Core 1 loads the latest and the previous, and interpolates to **this** deadline. It never peeks again that frame. If the sim misses a publish, Core 1 draws the last complete pose. It does not extrapolate.
 
 ```c
 /* idea, not a copy-paste API */
@@ -67,11 +66,11 @@ Odd `seq` = write in progress. Two slots so the writer can fill the other one.
 
 **[`volatile`](../glossary.md#volatile) is not a barrier** on [SMP](../glossary.md#smp) Xtensa. Use `_Atomic` / `atomic_load` / `atomic_store` (architecture §5).
 
-Sound the other way: Core 1 **never waits**. It pushes `SfxEvt` into an 8-deep ring; if full, drop oldest. Core 0 mixes.
+Sound stays on Core 0. The sim pushes `SfxEvt` into an 8-deep ring and does not call the mixer. If the ring is full, drop oldest. The mixer is higher priority than the sim.
 
 ## `DRAM_ATTR`
 
-Shared state lives in internal [DRAM](../glossary.md#dram), not [PSRAM](../glossary.md#psram). Wi-Fi DMA cannot live in PSRAM. The blit inner loop never touches PSRAM. See [guide 02](../guides/02-soc-memory-smp.md).
+The pose, the indexed frame, and the DMA bands live in internal [DRAM](../glossary.md#dram), not [PSRAM](../glossary.md#psram). Wi-Fi DMA cannot live in PSRAM. The raster inner loop never touches PSRAM. See [guide 02](../guides/02-soc-memory-smp.md).
 
 ## Checkpoint
 

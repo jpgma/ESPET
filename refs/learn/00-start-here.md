@@ -62,7 +62,7 @@ Build in sim
 - [ ] IMU registers — [esp32-s3](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/learn/imu-registers.md) ([stub 08](./08-imu-registers.md))
 - [ ] [09 Complementary filter](./09-complementary-filter.md)
 - [ ] [10 Gravity-locked cube](./10-gravity-locked-cube.md) (authored room; IMU bounce, not orbit)
-- [ ] [11 Rigid meshes](./11-sheets-and-sprites.md)
+- [ ] [11 Skinned mesh](./11-sheets-and-sprites.md)
 - [ ] [12 Clips, springs, hitboxes](./12-clips-springs-hitboxes.md)
 
 Real board (read now)

@@ -4,25 +4,25 @@
 
 **Read:** [architecture 3. Memory](../../architecture.md#3-memory) · [architecture 10 dirty rect](../../architecture.md#10-rendering) · [guide 03](../guides/03-display-st7789.md) · [guide 02 memory law](../guides/02-soc-memory-smp.md)
 
-**Code to produce:** indexed-8 back buffer in `firmware/` (still `main.c` is fine), 32-entry [palette](../glossary.md#palette), expand dirty rows to an RGB565 [bounce](../glossary.md#bounce-buffer), `draw_bitmap` only that window.
+**Code to produce:** one indexed-8 framebuffer in `firmware/` (still `main.c` is fine), a 256-entry [palette](../glossary.md#palette), expand dirty rows to RGB565 DMA [bands](../glossary.md#bounce-buffer), `draw_bitmap` only those rows.
 
 ## Why indexed-8
 
-A 240×240 RGB565 frame is 115200 bytes. Two of them plus Wi-Fi DMA in internal RAM does not fit the product. Indexed-8 is 57600 bytes per buffer. Colour 0 = [key](../glossary.md#color-key) (transparent in sprites). Palette has 32 real colours; a 256-slot table is still fine if slot 32…255 unused. **Per-room palettes** (1–15 actor **ramps** / 16–31 scenery) arrive with Hall; this lesson is one table.
+A 240×240 RGB565 frame is 115200 bytes. Two of them plus Wi-Fi DMA in internal RAM does not fit. One indexed-8 frame is 57600 bytes. Colour 0 = [key](../glossary.md#color-key) (transparent in stamps). The product palette is **256** entries: **1–63** actor ramps, **64–255** the room. This lesson may fill only a few slots.
 
-**Scanout:** indexed back buffer → expand dirty rows to RGB565 bounce → [GDMA](../glossary.md#gdma) to ST7789.
+**Scanout:** indexed frame → expand dirty rows into two 8-row RGB565 bands → [GDMA](../glossary.md#gdma) to ST7789.
 
-The blit inner loop **never** touches [PSRAM](../glossary.md#psram).
+The raster inner loop **never** touches [PSRAM](../glossary.md#psram). There is no photograph to restore.
 
 ## Palette
 
 ```c
-uint16_t palette[256];   /* fill 0..31 with rgb565(); [0] is key, never drawn as pet */
-uint8_t  fb[240 * 240];  /* or two buffers: front/back */
-uint16_t bounce[240];    /* one row, or a few rows */
+uint16_t palette[256];          /* [0] is key; actor ramps live in 1..63 */
+uint8_t  fb[240 * 240];         /* one frame, not two */
+uint16_t band[2][8 * 240];      /* DMA bands */
 ```
 
-Clear `fb` to 0. Draw with indices 1…31.
+Clear `fb` to a room index (not 0, or the glass looks empty). Draw the dummy block with an index in 1…63.
 
 ## Dirty rect
 
@@ -38,7 +38,7 @@ A 120×140 RGB565 rect ≈ 7 ms @ 40 MHz. Full frame ≈ 23 ms. Budget lives or 
 
 ## GRAM-hold
 
-If nothing moved, **do not SPI**. The panel [GRAM](../glossary.md#gram) keeps the last picture. Later: skip when springs/toys settled and `fx_live==0` (architecture §4) — **not** `|Δq|`. For this lesson: skip `draw_bitmap` when the dummy sprite AABB did not change.
+If nothing moved, **do not SPI**. The panel [GRAM](../glossary.md#gram) keeps the last picture. Later: skip when the pose matches (architecture §4) — **not** `|Δq|`. For this lesson: skip `draw_bitmap` when the dummy block did not move.
 
 Wait the **previous** DMA before kicking the next, not after physics in a way that stalls Core 0 (there is only one thread in sim; still structure it).
 
