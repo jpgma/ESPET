@@ -1,6 +1,6 @@
 # ESPET
 
-Gravity-locked habitat of cube rooms on a [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). Small rooms are the close-up pet; large rooms are the house — a floor shadow, plants you walk behind, a bowl you munch at. The room is a photograph; the pet, toys, and knockables are live low-poly meshes. Product rules: [architecture.md](architecture.md).
+Gravity-locked habitat of cube rooms on a [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54). The room is live flat triangles. The pet is one smooth-skinned mesh on six bones. Small rooms frame the pet; large rooms frame the house. Product rules: [architecture.md](architecture.md). Look refs: [refs/look/](refs/look/).
 
 Hardware bible (pins, schematic, datasheets, hello + `board-sim`): **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). This repo keeps its own sim for habitat work; pin law lives there.
 
