@@ -48,15 +48,15 @@ sim.bat
 
 **Click** (little or no move) taps the fake CST816 — hello logs XY and paints a yellow speck. **Drag** past a few pixels tilts the fake IMU. The hello firmware tints the screen from accel and draws a white bar from gyro rate so you can see both axes.
 
-## Real board (later)
+## Real board
 
-Not part of `sim.bat`. Turn `firmware/` into an ESP-IDF project and:
+Not part of `sim.bat`. From the repo root, with the board on USB:
 
 ```text
-idf.py -C firmware build flash monitor
+flash.bat
 ```
 
-Same `firmware/main.c` (plus real `sdkconfig` pins). Do not put `board-sim/fake_idf` on that include path. Pins and `BAT_EN` are in the [hardware contract](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md).
+That builds `firmware/` with ESP-IDF and flashes the Espressif USB port. `--port COMx` overrides the port. ESP-IDF is `%USERPROFILE%\esp\esp-idf`, or `IDF_PATH` if that is already set. Do not put `board-sim/fake_idf` on that include path. Pins and `BAT_EN` are in the [hardware contract](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md).
 
 ## Mental model
 

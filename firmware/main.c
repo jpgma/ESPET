@@ -6,6 +6,7 @@
 
 #include "board_pins.h"
 
+#include <stdalign.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +15,13 @@
 #include "driver/i2c_master.h"
 #include "driver/spi_master.h"
 #include "esp_err.h"
+#ifdef ESP_PLATFORM
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_vendor.h"
+#else
 #include "esp_lcd.h"
+#endif
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -22,9 +29,13 @@
 static const char *TAG = "hello";
 
 #define QMI8658_WHO_AM_I 0x00
+#define QMI8658_CTRL1 0x02
+#define QMI8658_CTRL2 0x03
+#define QMI8658_CTRL3 0x04
 #define QMI8658_CTRL7 0x08
 #define QMI8658_AX_L 0x35
 #define QMI8658_GX_L 0x3B
+#define LCD_PCLK_HZ (80 * 1000 * 1000)
 
 #define CST816_GESTURE 0x01
 #define CST816_CHIP_ID 0xA7
@@ -33,7 +44,7 @@ static const char *TAG = "hello";
 #define CST816_DIS_AUTO_SLEEP 0xFE
 #define CST816_EN_DCLICK 0x01
 
-static uint16_t s_fb[LCD_H_RES * LCD_V_RES];
+alignas(4) static uint16_t s_fb[LCD_H_RES * LCD_V_RES];
 static volatile int s_touch_irq;
 static int s_have_poke;
 static float s_poke_u;
@@ -193,6 +204,9 @@ void app_main(void)
         .i2c_port = I2C_NUM_0,
         .sda_io_num = PIN_I2C_SDA,
         .scl_io_num = PIN_I2C_SCL,
+#ifdef ESP_PLATFORM
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+#endif
         .flags.enable_internal_pullup = 1,
     };
     i2c_master_bus_handle_t bus = NULL;
@@ -220,8 +234,18 @@ void app_main(void)
         ESP_LOGE(TAG, "unexpected WHO_AM_I");
     }
 
-    uint8_t en[2] = {QMI8658_CTRL7, 0x03}; /* accel + gyro */
-    ESP_ERROR_CHECK(i2c_master_transmit(imu, en, 2, 100));
+    /* CTRL1 reset is 0x20: big-endian, no auto-increment. A 12-byte
+     * read repeats AX_L until ADDR_AI is set. CTRL2 reset is ±2 g;
+     * 4096 LSB/g is the ±8 g scale. Gyro /16 is ±2048 dps. */
+    uint8_t cfg[][2] = {
+        {QMI8658_CTRL1, 0x40}, /* ADDR_AI, little-endian */
+        {QMI8658_CTRL2, 0x26}, /* ±8 g, 125 Hz */
+        {QMI8658_CTRL3, 0x76}, /* ±2048 dps, ~112 Hz */
+        {QMI8658_CTRL7, 0x03}, /* accel + gyro */
+    };
+    for (size_t i = 0; i < sizeof(cfg) / sizeof(cfg[0]); i++) {
+        ESP_ERROR_CHECK(i2c_master_transmit(imu, cfg[i], 2, 100));
+    }
 
     uint8_t chip_reg = CST816_CHIP_ID;
     uint8_t chip = 0;
@@ -235,12 +259,28 @@ void app_main(void)
     uint8_t nosleep[2] = {CST816_DIS_AUTO_SLEEP, 0x01};
     ESP_ERROR_CHECK(i2c_master_transmit(tp, nosleep, 2, 100));
 
+#ifdef ESP_PLATFORM
+    spi_bus_config_t spibus = {
+        .mosi_io_num = PIN_LCD_MOSI,
+        .miso_io_num = -1,
+        .sclk_io_num = PIN_LCD_CLK,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .data4_io_num = -1,
+        .data5_io_num = -1,
+        .data6_io_num = -1,
+        .data7_io_num = -1,
+        .max_transfer_sz = LCD_H_RES * LCD_V_RES * (int)sizeof(uint16_t),
+    };
+    ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &spibus, SPI_DMA_CH_AUTO));
+#endif
+
     esp_lcd_panel_io_handle_t io = NULL;
     esp_lcd_panel_io_spi_config_t io_cfg = {
         .cs_gpio_num = PIN_LCD_CS,
         .dc_gpio_num = PIN_LCD_DC,
-        .spi_mode = 0,
-        .pclk_hz = 40 * 1000 * 1000,
+        .spi_mode = 3,
+        .pclk_hz = LCD_PCLK_HZ,
         .trans_queue_depth = 10,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
@@ -251,6 +291,9 @@ void app_main(void)
     esp_lcd_panel_dev_config_t panel_cfg = {
         .reset_gpio_num = PIN_LCD_RST,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+#ifdef ESP_PLATFORM
+        .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
+#endif
         .bits_per_pixel = 16,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io, &panel_cfg, &panel));
