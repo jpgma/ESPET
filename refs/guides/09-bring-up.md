@@ -19,12 +19,15 @@ Steal **pins** from Waveshare examples. Do not leave LVGL, XiaoZhi, or TF audio 
 ## Always-on invariants (fail the step if broken)
 
 - Core 1 never waits on Core 0 / I2C / I2S / Wi-Fi.
-- One I2C owner. No ES8311 writes inside the IMU drain.
+- **One I2C owner task.** GPIO6 / GPIO48 ISRs only post. No ES8311 writes inside the IMU drain. Mixer posts start/stop/volume.
 - World down is gravity. Pet does not lean with the glass.
 - Camera is room-authored; pet yaw is continuous; `view_idx` (0..3) is painter's order only.
-- PA and I2S clocks off when both voices are dead.
-- ES7210 and TF card not initialized.
+- PA and I2S clocks off when both voices are dead. PA ≥35 ms wake / ≥120 ms cold.
+- ES7210 **never probed**. TF card not initialized. GPIO18 is not a spare.
 - Bluetooth off. Wi-Fi off unless cortex.
+- `BAT_EN` high before any blocking work.
+
+Hello in `board-sim`: click taps CST816 (debug XY); drag tilts the IMU.
 
 ## After the hardware exists
 

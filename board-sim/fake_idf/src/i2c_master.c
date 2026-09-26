@@ -6,6 +6,7 @@
 
 #define QMI8658_ADDR_HI 0x6B
 #define QMI8658_ADDR_LO 0x6A
+#define CST816_ADDR 0x15
 
 struct i2c_master_bus_t {
     int dummy;
@@ -55,10 +56,13 @@ esp_err_t i2c_master_transmit(i2c_master_dev_handle_t handle, const uint8_t *wri
     if (!handle || !write_buffer) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (!is_qmi(handle->addr)) {
-        return ESP_ERR_NOT_FOUND;
+    if (is_qmi(handle->addr)) {
+        return board_sim_imu_i2c_tx(write_buffer, write_size) == 0 ? ESP_OK : ESP_FAIL;
     }
-    return board_sim_imu_i2c_tx(write_buffer, write_size) == 0 ? ESP_OK : ESP_FAIL;
+    if (handle->addr == CST816_ADDR) {
+        return board_sim_touch_i2c_tx(write_buffer, write_size) == 0 ? ESP_OK : ESP_FAIL;
+    }
+    return ESP_ERR_NOT_FOUND;
 }
 
 esp_err_t i2c_master_transmit_receive(i2c_master_dev_handle_t handle, const uint8_t *write_buffer,
@@ -69,9 +73,15 @@ esp_err_t i2c_master_transmit_receive(i2c_master_dev_handle_t handle, const uint
     if (!handle || !read_buffer) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (!is_qmi(handle->addr)) {
-        return ESP_ERR_NOT_FOUND;
+    if (is_qmi(handle->addr)) {
+        return board_sim_imu_i2c_txrx(write_buffer, write_size, read_buffer, read_size) == 0
+                   ? ESP_OK
+                   : ESP_FAIL;
     }
-    return board_sim_imu_i2c_txrx(write_buffer, write_size, read_buffer, read_size) == 0 ? ESP_OK
-                                                                                         : ESP_FAIL;
+    if (handle->addr == CST816_ADDR) {
+        return board_sim_touch_i2c_txrx(write_buffer, write_size, read_buffer, read_size) == 0
+                   ? ESP_OK
+                   : ESP_FAIL;
+    }
+    return ESP_ERR_NOT_FOUND;
 }

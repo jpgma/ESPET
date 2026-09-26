@@ -1,7 +1,10 @@
 /*
  * Hello firmware for the fake (and later real) Waveshare panel.
  * No SDL. Cube / pet logic does not belong here yet.
+ * This loop is the I2C owner: IMU poll + CST816 on INT. No ES7210.
  */
+
+#include "board_pins.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -18,22 +21,23 @@
 
 static const char *TAG = "hello";
 
-#define LCD_H_RES 240
-#define LCD_V_RES 240
-#define PIN_LCD_CS 21
-#define PIN_LCD_DC 45
-#define PIN_LCD_RST 40
-#define PIN_LCD_BL 46
-#define PIN_I2C_SCL 41
-#define PIN_I2C_SDA 42
-#define QMI8658_ADDR 0x6B
 #define QMI8658_WHO_AM_I 0x00
 #define QMI8658_CTRL7 0x08
 #define QMI8658_AX_L 0x35
 #define QMI8658_GX_L 0x3B
-#define ACCEL_LSB_PER_G 4096
+
+#define CST816_GESTURE 0x01
+#define CST816_CHIP_ID 0xA7
+#define CST816_MOTION_MASK 0xEC
+#define CST816_IRQ_CTL 0xFA
+#define CST816_DIS_AUTO_SLEEP 0xFE
+#define CST816_EN_DCLICK 0x01
 
 static uint16_t s_fb[LCD_H_RES * LCD_V_RES];
+static volatile int s_touch_irq;
+static int s_have_poke;
+static float s_poke_u;
+static float s_poke_v;
 
 static uint16_t rgb565(int r, int g, int b)
 {
@@ -86,11 +90,76 @@ static void fill_from_imu(float ax, float ay, float az, float gyro_abs)
             s_fb[y * LCD_H_RES + x] = fg;
         }
     }
+
+    if (!s_have_poke) {
+        return;
+    }
+    int px = (int)(s_poke_u * (float)(LCD_H_RES - 1) + 0.5f);
+    int py = (int)(s_poke_v * (float)(LCD_V_RES - 1) + 0.5f);
+    if (px < 1) {
+        px = 1;
+    }
+    if (px > LCD_H_RES - 2) {
+        px = LCD_H_RES - 2;
+    }
+    if (py < 1) {
+        py = 1;
+    }
+    if (py > LCD_V_RES - 2) {
+        py = LCD_V_RES - 2;
+    }
+    uint16_t mark = rgb565(255, 220, 0);
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            s_fb[(py + dy) * LCD_H_RES + (px + dx)] = mark;
+        }
+    }
+}
+
+static void touch_isr(void *arg)
+{
+    (void)arg;
+    s_touch_irq = 1;
+}
+
+static void drain_touch(i2c_master_dev_handle_t tp)
+{
+    uint8_t reg = CST816_GESTURE;
+    uint8_t raw[6];
+    memset(raw, 0, sizeof(raw));
+    if (i2c_master_transmit_receive(tp, &reg, 1, raw, 6, 100) != ESP_OK) {
+        return;
+    }
+    int x = ((raw[2] & 0x0F) << 8) | raw[3];
+    int y = ((raw[4] & 0x0F) << 8) | raw[5];
+    if (x < 0) {
+        x = 0;
+    }
+    if (x > LCD_H_RES - 1) {
+        x = LCD_H_RES - 1;
+    }
+    if (y < 0) {
+        y = 0;
+    }
+    if (y > LCD_V_RES - 1) {
+        y = LCD_V_RES - 1;
+    }
+    s_poke_u = (float)x / (float)(LCD_H_RES - 1);
+    s_poke_v = (float)y / (float)(LCD_V_RES - 1);
+    s_have_poke = 1;
+    ESP_LOGI(TAG, "CST816 gesture=0x%02x finger=%u xy=%d,%d", raw[0], raw[1], x, y);
 }
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "hello Waveshare LCD + QMI8658");
+    ESP_LOGI(TAG, "hello Waveshare LCD + QMI8658 + CST816");
+
+    gpio_config_t bat = {
+        .pin_bit_mask = 1ull << PIN_BAT_EN,
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    ESP_ERROR_CHECK(gpio_config(&bat) == 0 ? ESP_OK : ESP_FAIL);
+    gpio_set_level(PIN_BAT_EN, 1);
 
     gpio_config_t bl = {
         .pin_bit_mask = 1ull << PIN_LCD_BL,
@@ -98,6 +167,27 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(gpio_config(&bl) == 0 ? ESP_OK : ESP_FAIL);
     gpio_set_level(PIN_LCD_BL, 1);
+
+    gpio_config_t tp_rst = {
+        .pin_bit_mask = 1ull << PIN_TOUCH_RST,
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    ESP_ERROR_CHECK(gpio_config(&tp_rst) == 0 ? ESP_OK : ESP_FAIL);
+    gpio_set_level(PIN_TOUCH_RST, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(PIN_TOUCH_RST, 1);
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    gpio_config_t tp_int = {
+        .pin_bit_mask = 1ull << PIN_TOUCH_INT,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = 1,
+        .intr_type = GPIO_INTR_NEGEDGE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&tp_int) == 0 ? ESP_OK : ESP_FAIL);
+    ESP_ERROR_CHECK(gpio_set_intr_type(PIN_TOUCH_INT, GPIO_INTR_NEGEDGE) == 0 ? ESP_OK : ESP_FAIL);
+    ESP_ERROR_CHECK(gpio_install_isr_service(0) == 0 ? ESP_OK : ESP_FAIL);
+    ESP_ERROR_CHECK(gpio_isr_handler_add(PIN_TOUCH_INT, touch_isr, NULL) == 0 ? ESP_OK : ESP_FAIL);
 
     i2c_master_bus_config_t bus_cfg = {
         .i2c_port = I2C_NUM_0,
@@ -115,6 +205,13 @@ void app_main(void)
     i2c_master_dev_handle_t imu = NULL;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus, &imu_cfg, &imu));
 
+    i2c_device_config_t tp_cfg = {
+        .device_address = CST816_ADDR,
+        .scl_speed_hz = 400000,
+    };
+    i2c_master_dev_handle_t tp = NULL;
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus, &tp_cfg, &tp));
+
     uint8_t who_reg = QMI8658_WHO_AM_I;
     uint8_t who = 0;
     ESP_ERROR_CHECK(i2c_master_transmit_receive(imu, &who_reg, 1, &who, 1, 100));
@@ -125,6 +222,18 @@ void app_main(void)
 
     uint8_t en[2] = {QMI8658_CTRL7, 0x03}; /* accel + gyro */
     ESP_ERROR_CHECK(i2c_master_transmit(imu, en, 2, 100));
+
+    uint8_t chip_reg = CST816_CHIP_ID;
+    uint8_t chip = 0;
+    ESP_ERROR_CHECK(i2c_master_transmit_receive(tp, &chip_reg, 1, &chip, 1, 100));
+    ESP_LOGI(TAG, "CST816 ChipID=0x%02x", chip);
+
+    uint8_t motion[2] = {CST816_MOTION_MASK, CST816_EN_DCLICK};
+    ESP_ERROR_CHECK(i2c_master_transmit(tp, motion, 2, 100));
+    uint8_t irqctl[2] = {CST816_IRQ_CTL, 0x60};
+    ESP_ERROR_CHECK(i2c_master_transmit(tp, irqctl, 2, 100));
+    uint8_t nosleep[2] = {CST816_DIS_AUTO_SLEEP, 0x01};
+    ESP_ERROR_CHECK(i2c_master_transmit(tp, nosleep, 2, 100));
 
     esp_lcd_panel_io_handle_t io = NULL;
     esp_lcd_panel_io_spi_config_t io_cfg = {
@@ -151,6 +260,11 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
 
     for (;;) {
+        if (s_touch_irq) {
+            s_touch_irq = 0;
+            drain_touch(tp);
+        }
+
         uint8_t ax_reg = QMI8658_AX_L;
         uint8_t raw[12];
         memset(raw, 0, sizeof(raw));

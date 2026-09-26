@@ -13,11 +13,11 @@ Style: data-oriented C/C++ on ESP-IDF. POD tables, integer IDs, no STL in the ho
 | Decision | Value |
 | :--- | :--- |
 | Hardware | [Waveshare ESP32-S3-Touch-LCD-1.54](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54) (touch + battery). Pins, schematic, datasheets: **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154/HARDWARE.md`](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md) |
-| SoC | ESP32-S3R8, dual LX7 @ 240 MHz, 512 KB SRAM, **8 MB in-package octal PSRAM**, 16 MB quad NOR |
-| Display | 1.54" IPS **240×240**, ST7789, **4-wire SPI**, RGB565, GRAM on-panel, **no TE pin** |
-| IMU | QMI8658 (accel + gyro, **no magnetometer**). Sparse play bus: shake / set-down / face-down. **Not a camera.** |
-| Touch | CST816 (I2C, one finger) |
-| Audio | **v1.** ES8311 + NS4150B. Procedural **2-voice** mixer on Core 0. ES7210 **off** (mic later). Speaker on MX1.25 **TBD at bring-up**. |
+| SoC | ESP32-S3R8 QFN56 **rev v0.2**, dual LX7. **240 MHz confirmed** (`CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240`; the shorter `CONFIG_ESP_DEFAULT_CPU_FREQ_240` does nothing). 512 KB SRAM, **8 MB in-package octal PSRAM** (AP Memory gen3, 3.3 V, test OK), 16 MB quad NOR |
+| Display | 1.54" IPS **240×240 visible**, ST7789, **4-wire SPI**, RGB565, controller GRAM **240×320**, **no TE / no MISO**. **Mode 3 at 80 MHz is clear** on this glass. One full frame **12271 µs**. Window the visible 240×240; `CASET`/`RASET` origin is still unlocked. |
+| IMU | **QMI8658A** (`WHO_AM_I` `0x05`, `REVISION_ID` `0x7C`), I2C **0x6B** only, INT GPIO6 idle high. No magnetometer. `CTRL1` resets to `0x20` (no address auto-increment, big-endian); set `ADDR_AI` and clear `BE` before a little-endian burst. `CTRL2` resets to ±2 g — write **±8 g (4096 LSB/g)** before using that scale. Start gyro **±1024 dps**, FIFO watermark ~100 Hz. Face-up rest: gravity on **−Z** (~1.03 g), X/Y under 0.16 g, so **+Z is out of the glass**. Sparse play: shake / set-down / face-down. **Not a camera.** |
+| Touch | **CST816D** (`ChipID` `0xB6`, proj `0x27`, fw `0x01`), I2C **0x15**, INT 48 idle high, RST 47, **one finger**. The resources pack says CST816T; S/T/D share the map. `EnDClick` exists (`GestureID` `0x0B`); mapping is lizard TBD. |
+| Audio | **v1.** ES8311 **0x18** (ID `0x83`/`0x11`) + NS4150B GPIO7. Procedural **2-voice** mixer on Core 0. ES7210 **0x40 never probe** (it ACKs; ID bytes stay `0xFF` until MCLK). MX1.25 speaker is **fitted, non-polarized, and audible** — a 440 Hz sine at 16 kHz was heard. Product rate stays 12 kHz. |
 | Storage | TF slot present. **Unused in the frame loop.** Audio is not on the card. |
 | Display rate | **30 FPS** cap. Physics in the same 33 ms loop. |
 | Battery | ~1000 mAh. **Strive for ~8 h** awake, dim — not a hard cap. Wi-Fi is a luxury mode. |
@@ -166,18 +166,26 @@ Pet yaw is **continuous**. Part meshes rotate with the core 3×4 (and limb aim).
 
 Full GPIO table, schematic, strapping traps: [jpgma/esp32-s3 HARDWARE.md](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md) (private). Confirm once against that schematic, then treat as law.
 
-Thin lock (do not invent pins):
+Thin lock (do not invent pins). Drive **`BAT_EN` high in `app_main` before any blocking work.** Host SPI is mux: this product uses **SPI3** (vendor demos use SPI2 — not a net).
 
 | Function | GPIO | Notes |
 | :--- | :--- | :--- |
 | LCD SPI3 (CS/CLK/MOSI, DC/RST/BL) | 21/38/39, 45/40/46 | write-only, **no TE / no MISO**; 45 and 46 strap |
-| I2C (SCL/SDA) | 41/42 | one bus: QMI8658, CST816, ES8311, ES7210 |
-| BAT_EN | 2 | **hold high** or the board dies on battery |
-| USB D−/D+ | 19/20 | native CDC / JTAG; no CH340 |
+| I2C (SCL/SDA) | 41/42 | one bus, one owner. Pads are these same wires |
+| IMU INT | 6 | FIFO watermark. Product path; hello poll is testbed-only |
+| Touch INT / RST | 48 / 47 | IRQ. Do not poll from the IMU drain |
+| PA (NS4150B CTRL) | 7 | gate between phrases |
+| I2S MCLK/BCLK/WS/DIN/DOUT | 8/9/10/11/12 | DIN=ES7210 (unused). DOUT=ES8311 |
+| BAT_EN | 2 | **hold high** (`rtc_gpio_hold` in deep sleep) or the board dies on battery |
+| VBAT ADC / CHG_STAT | 1 / 3 | VBAT = VADC **×3**. `CHG_STAT` **active-low** while charging. GPIO3 is also an S3 strap |
+| PWR / PLUS / BOOT | 5 / 4 / 0 | PWR long-press = latch off. PLUS is lizard TBD |
+| USB D−/D+ | 19/20 | native CDC / JTAG; no CH340. Serial/JTAG **dies in deep sleep** |
 
-**sdkconfig:** `CONFIG_SPIRAM_MODE_OCT=y`, `CONFIG_SPIRAM_SPEED_80M=y`, quad flash 80 MHz (not OPI), `CONFIG_FREERTOS_HZ=1000`, Bluetooth **off**, Wi-Fi started only in cortex mode, USB CDC on boot.
+I2C 7-bit: QMI8658 **0x6B**, CST816 **0x15**, ES8311 **0x18**, ES7210 **0x40 never probe**. No dedicated RTC IC — persistence is S3 RTC SRAM. TF SDMMC 4-bit (16/15/17/18/13/14) is unused; **GPIO18 is TF D1, not a spare.** Charge current is ISET **160 kΩ**, not software.
 
-**SPI:** try 80 MHz; fall back to 40 MHz. Full 240×240 RGB565 @ 40 MHz ≈ 23 ms → that is why 30 FPS and **dirty-rect**. Door cuts may pay the full frame once. Extra slack at 80 MHz is how mesh overdraw stays fun — measure on silicon before designing around 40.
+**sdkconfig:** `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_SPIRAM_MODE_OCT=y`, `CONFIG_SPIRAM_SPEED_80M=y`, quad flash 80 MHz (not OPI), `CONFIG_FREERTOS_HZ=1000`, Bluetooth **off**, Wi-Fi started only in cortex mode, USB CDC on boot. This unit’s flash JEDEC ID is **0x204018** (XMC). The schematic text says W25Q128JVSIQ. IDF reports the chip as `generic`. QIO 80 MHz already boots.
+
+**SPI:** **mode 3, 80 MHz**, picture clear. Full 240×240 RGB565 measured **12271 µs** (wire ≈ 11.5 ms; 40 MHz would be ≈ 23 ms). 30 FPS still wants **dirty-rect**; a full frame now leaves about 21 ms inside the 33 ms budget. Door cuts may pay the full frame once. Controller GRAM is **240×320**; window the visible **240×240** and lock offsets before trusting dirty-rect.
 
 ---
 
@@ -246,13 +254,13 @@ TF still unused.
 | Prio | Job | Rate |
 | :--- | :--- | :--- |
 | IDF (~22) | Wi-Fi / LwIP | cortex mode only |
-| 12 | QMI8658 FIFO + complementary filter + **IMU event classify** | 100 Hz |
-| 11 | CST816 IRQ → poke UV, double-tap one-shot | event |
+| 13 | **I2C owner** (only task that talks 41/42) | drain / event / codec posts |
+| 12 | complementary filter + **IMU event classify** (after owner drain) | 100 Hz |
 | 8 | Needs, wander, gaze, flinch, clip requests, room walk, cortex inject | 20 Hz |
-| 7 | Mixer: fill I2S, PA gate, codec I2C start/stop | 12 kHz / 256-sample block |
+| 7 | Mixer: fill I2S, PA gate. **Posts** codec start/stop/volume; does not I2C | 12 kHz / 256-sample block |
 | 5 | Backlight, VBAT, BAT_EN, PWR, Wi-Fi up/down | 1–10 Hz |
 
-**One I2C owner** on 41/42. ES8311 register writes only on play start/stop/volume — never inside the 100 Hz IMU drain. ES7210 not initialized.
+**One I2C owner** on 41/42 is the **only** caller of I2C. GPIO6 (IMU FIFO) and GPIO48 (CST816) ISRs **post** — no I2C in an ISR. The owner drains QMI8658 FIFO and reads a CST816 burst; it never writes ES8311 inside that drain. The mixer never talks I2C; it posts start/stop/volume. Do not add ES7210 to the device table. Owner serializes the bus; it is not the mixer.
 
 ### Core 1 — the body (one pinned task)
 
@@ -516,7 +524,9 @@ Core 0 @ 12 kHz mono, block 256:
 PA GPIO 7 high only while a voice is live
 ```
 
-**12 kHz, not 24.** This speaker and this look do not need XiaoZhi’s 24 kHz duplex. Confirm with a sine at bring-up; drop to 8 kHz only if the amp/coil is ugly. Steal **pins**, not that audio graph. No MP3, no TF, no AEC.
+**PA times (NS4150B typical):** raise GPIO7 **≥35 ms** before the first sample (wake). Cold start **≥120 ms** before the first chirp. Do not re-trigger during **~80 ms** shutdown. `ISD` is 1–10 µA with CTRL=0 — PA **must** drop between phrases.
+
+**12 kHz, not 24.** This speaker and this look do not need XiaoZhi’s 24 kHz duplex. A 440 Hz sine at 16 kHz was already heard on this MX1.25 speaker, so the amp and coil are alive; the product rate stays 12 kHz. Steal **pins**, not that audio graph. No MP3, no TF, no AEC.
 
 **Two voices:** a wave that bops a toy **layers** grunt + bop. A third event of the same class replaces that voice; it does not stack. Last-event-wins inside a class.
 
@@ -544,11 +554,11 @@ Collision map: `(pair → patch_id)` in a tiny table. Not art.
 
 **Sleep / GRAM-hold:** Core 1 may skip SPI and WFI while a tail plays. Do **not** light-sleep or deep-sleep the chip, and do not drop PA, until both voices decay to zero (or a hard cap ~800 ms). Face-down: **do not start** new events; let the current tail end; PA low; then sleep.
 
-**Codec:** lazy-init ES8311 on first sound; **standby** between phrases (re-init is tens of ms — a wall hit would miss). Full off only on deep sleep. Volume **fixed** in v1 (studio may be louder, like backlight). PLUS is not volume.
+**Codec:** lazy-init ES8311 on first sound (I2C **0x18**, owner task). **Standby** between phrases (re-init is tens of ms — a wall hit would miss). Full off only on deep sleep. Volume **fixed** in v1 (studio may be louder, like backlight). PLUS is not volume.
 
-**Speaker:** MX1.25 header. Confirm when the board arrives. Bring-up is I2C ACK + PA pulse + sine; open header is not a missing driver.
+**Speaker:** MX1.25 header, non-polarized. Confirm when the board arrives. Bring-up is I2C ACK + PA pulse + sine; open header is not a missing driver.
 
-**Mic / ES7210:** later. Not initialized. DIN pin unused.
+**Mic / ES7210:** I2C **0x40**. Two MEMS + analog AEC tap on MIC3. **Never probe. Never init.** DIN pin unused.
 
 ---
 
@@ -798,21 +808,26 @@ If/when a think pose exists: set it **immediately** on a cortex-worthy event so 
 
 ## 14. Power (~8 h, strive)
 
-1000 mAh / 8 h ≈ **125 mA average.** Strive for it. Chirps on battery are in. Idle I2S is not.
+1000 mAh / 8 h ≈ **125 mA average.** Strive for it. Chirps on battery are in. Idle I2S is not. Panel LED typical **60 mA @ 3.0 V** — at 100% that is ~half the budget, so battery PWM **30–40%** is physics, not taste. Start from vendor **LEDC 5 kHz / 10-bit**.
 
-Habitat idle is the easy case: tiny dirty rect, IMU at event rate, GRAM-hold when springs settle, RBs sleep, and **`fx_live==0`**. Close-up play matches old pet-sized SPI. Door cuts are rare full frames. USB may full-frame while FX live; that is studio, not the 8 h path.
+Habitat idle is the easy case: tiny dirty rect, IMU at event rate, GRAM-hold when springs settle, RBs sleep, and **`fx_live==0`**. Close-up play matches old pet-sized SPI. Door cuts are rare full frames. USB may full-frame while FX live; that is studio, not the 8 h path. `CHG_STAT` is status, not a play-mode switch. Charge current is the ISET resistor, not firmware.
 
 | Lever | Default |
 | :--- | :--- |
-| Backlight PWM | ~30–40% battery; higher on USB; bump on poke, decay |
+| Backlight PWM | **30–40%** battery (60 mA LED); higher on USB; bump on poke, decay |
 | ST7789 | Dirty only |
 | CPU | 240 MHz interacting; 80/160 after a few seconds still |
 | Slack | Core 1 WFI per frame. Chip light-sleep **only if mixer idle** |
 | Wi-Fi | Off unless cortex |
 | Audio | PA + I2S clocks only while a voice is live. ES7210 off. SD off |
-| Deep sleep | Face-down, PWR, long idle — **finish the tail**, PA low, then RTC restore |
+| Deep sleep | Face-down, PWR, long idle — **finish the tail**, PA low, `rtc_gpio_hold` on `BAT_EN`, then RTC restore |
 
-USB in = **studio mode** (bright, 30 FPS, no light-sleep, cortex allowed, audio may be louder). Unplug = battery personality. Always hold `BAT_EN`. PWR long-press = latch off.
+USB in = **studio mode** (bright, 30 FPS, no light-sleep, cortex allowed, audio may be louder, USB debug). Unplug = battery personality. Always hold `BAT_EN`. PWR long-press = latch off. Deep sleep ⇒ **no** USB Serial/JTAG.
+
+**v1 wake map** (confirm edges on silicon):
+
+- **Light-sleep** (mixer idle): timer + CST816 INT **48** + PLUS **4**. IMU INT **6** only if shake should abort sleep. USB debug is off in this state.
+- **Deep sleep / PWR latch-off:** hardware (PWR / USB plug), not a software IMU camera. Face-down *pose* is lizard TBD.
 
 ---
 
@@ -820,11 +835,11 @@ USB in = **studio mode** (bright, 30 FPS, no light-sleep, cortex allowed, audio 
 
 ESP-IDF ≥ 5.5. C++ as a better C: `-fno-exceptions -fno-rtti`.
 
-Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). `esp_lcd` ST7789 + GDMA. Own `CASET`/`RASET`. IMU = I2C FIFO + filter. CST816 on INT. I2S TX to ES8311. Steal Waveshare **pins only**, not LVGL/XiaoZhi (not the 24 kHz duplex/AEC stack).
+Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). `esp_lcd` ST7789 + GDMA. Own `CASET`/`RASET` (visible 240×240 of 240×320 GRAM). IMU = I2C FIFO + GPIO6 (poll is hello/testbed only). CST816 on INT 48. I2S TX to ES8311. Steal Waveshare **pins only**, not LVGL/XiaoZhi (not the 24 kHz duplex/AEC stack).
 
 **Bring-up order**
 
-1. `BAT_EN`, USB-CDC, octal PSRAM 80 MHz.
+1. `BAT_EN` **first** in `app_main` (hello must drive GPIO2), USB-CDC, octal PSRAM 80 MHz.
 2. Backlight + full-screen fill. Print SPI microseconds (40 vs 80). Prefer 80 if the glass is clean.
 3. Indexed FB + dirty-rect dummy sprite (stamp path).
 4. Complementary filter → gravity / face-down / `jerk`. **Authored Nest backdrop**, Earth-up. **Product test:** tilt does **not** orbit; shake hops the debug mass.
@@ -838,9 +853,10 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 
 ## 16. Checklist
 
-- [ ] Pins vs [HARDWARE.md](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md); SPI mode 0 vs 3
-- [ ] `BAT_EN`; PWR latch; VBAT
-- [ ] Octal PSRAM 80 MHz; quad flash 80 MHz
+- [x] Pins vs [HARDWARE.md](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md). SPI **mode 3 at 80 MHz**, image clear, frame 12271 µs
+- [ ] `CASET`/`RASET` origin
+- [ ] `BAT_EN` first; PWR latch; VBAT ×3; `CHG_STAT` active-low
+- [x] Octal PSRAM 80 MHz (AP gen3, test OK); quad flash 80 MHz (JEDEC `0x204018`)
 - [ ] Cube world-up; pet on `Y=0`; no lean with the glass
 - [ ] Camera is room-authored; tilt does not orbit
 - [ ] Shake hops; cooldown; dust FX; GRAM-hold when still (`fx_live==0` **and** RBs sleeping)
@@ -857,12 +873,14 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 - [ ] Hall eat = L0 squash + crumbs + one patch; bowl does not flip; no Kitchen; no L2-in-L
 - [ ] `FxPool` 64; dust/crumbs/leaves stamps; floor only; one SFX per burst
 - [ ] Toy + knockable RBs vs scenery AABB; ≤3 toys; ≤4 knockables; Nest knockables = 0
-- [ ] ES8311 I2C; PA gated; 12 kHz sine; ES7210 off
+- [ ] One I2C owner; QMI8658 0x6B FIFO; CST816 0x15 on INT; ES8311 0x18; ES7210 never probed
+- [ ] ES8311 I2C via owner; PA ≥35 ms wake / ≥120 ms cold; 12 kHz sine; ES7210 off
 - [ ] `SfxEvt` from collide (threshold + cooldown); two voices (impact + clip `vox_id`)
 - [ ] Tail finishes; PA low; then light-sleep / face-down
 - [ ] Wi-Fi off: toy is whole
 - [ ] ~8 h dim, radio off (measure; strive)
 - [ ] Mesh rasterizer is firmware; `board-sim` never rasterizes a cube
+- [ ] Light-sleep wake: timer + INT 48 + PLUS 4 (IMU 6 only if shake-to-wake)
 
 ---
 
@@ -887,16 +905,22 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 17. Window-scissor clouds: skip.
 18. **N·L at setup, not in the pixel loop.** Flat bands are the look and the budget.
 19. **Leaves as 2-tri cards** can wait; dust/crumbs as stamps are the right v1.
-20. **Try 80 MHz SPI** on silicon before designing around 40. Extra ~11 ms of slack is how ambitious overdraw stays fun.
+20. **80 MHz SPI mode 3 is clear** on this glass. A full frame is ~12.3 ms, so the 33 ms budget keeps ~21 ms. Design dirty-rect around that, not around 23 ms.
 21. **Bowl does not flip.** Eat photograph > physics sandbox in Hall.
+22. Sim: **click-without-drag = CST816 tap**; drag past a few px = IMU. Do not overload left-drag.
+23. **`DisAutoSleep`** on CST816 from day one; first-tap-eaten is the usual foot-gun.
+24. GPIO3 is `CHG_STAT` and an S3 strap — bring-up note if USB-in-at-reset fights Serial/JTAG.
+25. **Do not add a debug LED on GPIO18** (TF D1).
+26. Lock `CASET`/`RASET` offsets before trusting dirty-rect.
+27. Overlay VBAT ×3 and backlight PWM in studio; 8 h is a measurement.
 
 ---
 
 ## 18. Open questions
 
-**Locked this pass:** room-authored camera. S/L only. Nest / Play / Hall / Yard. L2 6 part meshes vs L0 combined mesh as a room field. IMU = sparse bounce. Indexed-8. **Per-room palettes** with **1–15 actor ramps** / 16–31 scenery. Hybrid raster (baked backdrop + live rigid meshes, N·L bands, painter's). Floor **shadow** stamp. Occluder meshes in S and L (≤12 / ~200 tris; `cover_body` + head last). Toys **3** RBs; knockable props **≤4** (Nest 0); Hall bowl slide+yaw. Hall eat = **L0 munch** + crumbs. Event **FX** 64 stamps (dust/crumbs/leaves). Audio = Core 0 2-voice procedural mixer, `vox_id` on clips, `SfxEvt` from collide, ES7210 off. Lizard-brain *when* = later; spatial hooks exist.
+**Locked this pass:** room-authored camera. S/L only. Nest / Play / Hall / Yard. L2 6 part meshes vs L0 combined mesh as a room field. IMU = sparse bounce. Indexed-8. **Per-room palettes** with **1–15 actor ramps** / 16–31 scenery. Hybrid raster (baked backdrop + live rigid meshes, N·L bands, painter's). Floor **shadow** stamp. Occluder meshes in S and L (≤12 / ~200 tris; `cover_body` + head last). Toys **3** RBs; knockable props **≤4** (Nest 0); Hall bowl slide+yaw. Hall eat = **L0 munch** + crumbs. Event **FX** 64 stamps (dust/crumbs/leaves). Audio = Core 0 2-voice procedural mixer, `vox_id` on clips, `SfxEvt` from collide, ES7210 **never probed**. One I2C owner. I2C addrs 0x6B / 0x15 / 0x18. PA gate times. No RTC IC. CST816D `EnDClick` **exists** (`ChipID` `0xB6`). Light-sleep wake: timer + 48 + 4. Lizard-brain *when* = later; spatial hooks exist.
 
-1. **PLUS / double-tap** — call pet, send to Nest, ignore? TBD with the brain. Not volume. Not camera recenter.
+1. **PLUS / double-tap** — call pet, send to Nest, ignore? TBD with the brain. Not volume. Not camera recenter. Hardware can raise `GestureID` `0x0B`; policy is still lizard.
 2. **Play vs Nest** — two S rooms is locked for v1; could collapse to one S with toys later. Do not invent a fifth room.
 3. **Orthonormalize `up`** — leftover for gravity / face-down debug overlays only, not the window. Compile-time switch if you draw a debug horizon.
 4. **Part layer order (S).** Baked `draw_order[4][PART_COUNT]` per yaw is **locked** for parts. Occluders vs core, or `cover_body` before head. Do not pos-sort all six parts.
@@ -905,7 +929,7 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 7. **Patch tuning** (`f0`, decay, FM index). Machinery is locked; the sounds are data.
 8. **Face-down last frame** — prefer a Nest sleep pose vs freeze whatever room you were in? TBD with the brain. The *frame* is art.
 
-**Already locked, restated:** pet yaw is continuous; `view_idx` does not pick a photo. Room VP does not spin when the pet yaws. World down is gravity. No Kitchen. No L2-in-L. No follow-cam in L. No 4-yaw pet atlas. No skinned skeleton. No backdrop re-raster from IMU. No knockables in Nest. Bowl does not flip.
+**Already locked, restated:** pet yaw is continuous; `view_idx` does not pick a photo. Room VP does not spin when the pet yaws. World down is gravity. No Kitchen. No L2-in-L. No follow-cam in L. No 4-yaw pet atlas. No skinned skeleton. No backdrop re-raster from IMU. No knockables in Nest. Bowl does not flip. One I2C owner. ES7210 never probed. GPIO18 is not a spare.
 
 ---
 

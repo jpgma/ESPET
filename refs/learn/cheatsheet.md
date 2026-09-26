@@ -20,17 +20,30 @@ Full table is HARDWARE.md. Do not invent GPIOs.
 | Function | GPIO | Notes |
 | :--- | ---: | :--- |
 | LCD SPI3 | 21 / 38 / 39, 45 / 40 / 46 | no TE, no MISO; 45/46 strap |
-| I2C | 41 / 42 | one bus, Core 0 owner |
-| BAT_EN | 2 | hold high |
-| USB | 19 / 20 | native CDC |
+| I2C | 41 / 42 | **one owner task** on Core 0 |
+| IMU INT | 6 | FIFO watermark (product). Hello still polls |
+| Touch INT / RST | 48 / 47 | IRQ. `DisAutoSleep` |
+| PA | 7 | ≥35 ms wake, ≥120 ms cold, ~80 ms shutdown |
+| I2S | 8 / 9 / 10 / 11 / 12 | DIN unused |
+| BAT_EN | 2 | first in `app_main`; hold high |
+| VBAT / CHG | 1 / 3 | ×3; CHG active-low |
+| PWR / PLUS / BOOT | 5 / 4 / 0 | |
+| USB | 19 / 20 | native CDC. Dies in deep sleep |
 
-I2C: QMI8658 0x6B (hello), CST816 0x15, ES8311 0x18, ES7210 do not init.
+GPIO18 is TF D1 — not a spare. TF unused. No RTC IC.
 
-SPI: try 80 MHz, fall back 40. Mode 0 first. Full 240×240 RGB565 @ 40 MHz ≈ 23 ms → 30 FPS + dirty rect.
+I2C: QMI8658 **0x6B**, CST816 **0x15**, ES8311 **0x18**, ES7210 **0x40 never probe**.
+
+SPI: **mode 3, 80 MHz**, picture clear. GRAM 240×320, window 240×240. Full RGB565 ≈ **12.3 ms** measured → 30 FPS still wants dirty-rect, with ~21 ms left in the 33 ms budget.
+
+Backlight LED typical **60 mA @ 3.0 V** — battery PWM **30–40%**. LEDC 5 kHz / 10-bit to start.
+
+IMU start: **±8 g (4096 LSB/g)** / ±1024 dps.
 
 ## sdkconfig (this module)
 
 ```
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 # quad flash 80 MHz, not OPI

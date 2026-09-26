@@ -24,6 +24,7 @@ FetchContent_MakeAvailable(SDL2)
 add_library(board_sim_hw STATIC
     src/gram.c
     src/imu.c
+    src/touch.c
     fake_idf/src/esp_lcd.c
     fake_idf/src/i2c_master.c
     fake_idf/src/gpio.c
@@ -39,6 +40,7 @@ add_library(espet_firmware STATIC
 )
 target_include_directories(espet_firmware PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/fake_idf/include"
+    "${ESPET_ROOT}/firmware"
 )
 target_link_libraries(espet_firmware PRIVATE board_sim_hw)
 

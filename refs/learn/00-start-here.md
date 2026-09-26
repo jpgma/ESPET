@@ -27,7 +27,7 @@ Keep [glossary.md](../glossary.md) and [cheatsheet.md](./cheatsheet.md) open in 
 3. Run `sim.bat` from the repo root. You should see the checkpoint in the window.
 4. Tick the box below. Stop when the checkpoint is true, not when you feel done.
 
-The window is a fake 240×240 panel. Dragging it tilts a fake [IMU](../glossary.md#imu). Your firmware still has to *read* that chip and *draw* pixels. The simulator does not know what a cube is.
+The window is a fake 240×240 panel. **Click** taps a fake [CST816](../glossary.md#cst816). **Drag** tilts a fake [IMU](../glossary.md#imu). Your firmware still has to *read* those chips and *draw* pixels. The simulator does not know what a cube is.
 
 ## What you will not invent
 
@@ -40,7 +40,7 @@ Lessons **01, 03–05, 07, 09–12** run in ESPET `board-sim` today. Board bring
 Known sim gaps (write the code the architecture way anyway):
 
 - One thread, not two [cores](../glossary.md#core).
-- No [CST816](../glossary.md#cst816), [ES8311](../glossary.md#es8311), or `BAT_EN`.
+- No [ES8311](../glossary.md#es8311), `BAT_EN` rail, FIFO+IRQ, SMP, PSRAM, or GDMA. Click is a fake [CST816](../glossary.md#cst816).
 - IMU is polled; a real [FIFO](../glossary.md#fifo) + [IRQ](../glossary.md#irq) comes on hardware.
 
 Growing the simulator is a separate job. Do not stall a lesson waiting for it.

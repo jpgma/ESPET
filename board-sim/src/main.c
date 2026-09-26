@@ -40,6 +40,7 @@ int main(int argc, char **argv)
     const char *spi = getenv("BOARD_SIM_SPI_HZ");
     board_sim_gram_init();
     board_sim_imu_init();
+    board_sim_touch_init();
     if (spi && spi[0]) {
         board_sim_set_spi_hz(atoi(spi));
         printf("board-sim: SPI tax %d Hz\n", board_sim_spi_hz());
@@ -91,10 +92,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    int dragging = 0;
+    int pressed = 0;
+    int imu_drag = 0;
+    int down_x = 0, down_y = 0;
     int last_x = 0, last_y = 0;
     Uint32 last_drag_ms = SDL_GetTicks();
     Uint32 last_tick_ms = last_drag_ms;
+    Uint32 last_tap_ms = 0;
     int running = 1;
 
     while (running) {
@@ -104,32 +108,58 @@ int main(int argc, char **argv)
             if (e.type == SDL_QUIT) {
                 running = 0;
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-                dragging = 1;
+                pressed = 1;
+                imu_drag = 0;
+                down_x = e.button.x;
+                down_y = e.button.y;
                 last_x = e.button.x;
                 last_y = e.button.y;
                 last_drag_ms = SDL_GetTicks();
             } else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
-                dragging = 0;
-            } else if (e.type == SDL_MOUSEMOTION && dragging) {
+                if (pressed && !imu_drag) {
+                    const Uint32 now = SDL_GetTicks();
+                    int double_click = (last_tap_ms != 0 && (now - last_tap_ms) < 300) ? 1 : 0;
+                    int lx = down_x / BOARD_SIM_SCALE;
+                    int ly = down_y / BOARD_SIM_SCALE;
+                    board_sim_touch_on_tap(lx, ly, double_click);
+                    last_tap_ms = now;
+                }
+                pressed = 0;
+                imu_drag = 0;
+            } else if (e.type == SDL_MOUSEMOTION && pressed) {
                 const Uint32 now = SDL_GetTicks();
                 float dt = (now - last_drag_ms) / 1000.0f;
                 if (dt < 0.001f) {
                     dt = 0.001f;
                 }
-                /* Logical 240×240 coords if integer scale is on; use window pixels. */
                 int dx = e.motion.x - last_x;
                 int dy = e.motion.y - last_y;
                 last_x = e.motion.x;
                 last_y = e.motion.y;
                 last_drag_ms = now;
-                board_sim_imu_on_drag(dx, dy, dt);
+                if (!imu_drag) {
+                    int adx = e.motion.x - down_x;
+                    int ady = e.motion.y - down_y;
+                    if (adx < 0) {
+                        adx = -adx;
+                    }
+                    if (ady < 0) {
+                        ady = -ady;
+                    }
+                    if (adx + ady >= 8) {
+                        imu_drag = 1;
+                    }
+                }
+                if (imu_drag) {
+                    board_sim_imu_on_drag(dx, dy, dt);
+                }
             }
         }
 
         const Uint32 now = SDL_GetTicks();
         float tick_dt = (now - last_tick_ms) / 1000.0f;
         last_tick_ms = now;
-        if (!dragging) {
+        if (!imu_drag) {
             board_sim_imu_tick(tick_dt > 0.0f ? tick_dt : 0.033f);
         }
 

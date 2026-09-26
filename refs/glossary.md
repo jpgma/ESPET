@@ -38,7 +38,7 @@ Byte order of a multi-byte number. Little-endian = least significant byte first.
 
 ### Flash
 Non-volatile NOR memory the chip boots from. Slow to erase; can execute in place (XIP).
-**In ESPET:** 16 MB W25Q128, quad, 80 MHz. Firmware, meshes, stamps, clips. No PCM in v1. See [lesson 13](./learn/13-power-and-boot.md).
+**In ESPET:** 16 MB quad NOR, 80 MHz. This unit’s JEDEC ID is `0x204018` (XMC); the schematic text says W25Q128JVSIQ. Firmware, meshes, stamps, clips. No PCM in v1. See [lesson 13](./learn/13-power-and-boot.md).
 
 ### Heap
 Memory `malloc` hands out at runtime. Can fragment.
@@ -54,7 +54,7 @@ Exactly 16-bit signed integer (−32768…32767).
 
 ### LSB
 Least significant bit, or “counts per unit” in a sensor (LSB/g).
-**In ESPET:** hello firmware uses 4096 LSB/g; confirm against the QMI8658 scale you set. See [lesson 08](./learn/08-imu-registers.md).
+**In ESPET:** start **±8 g → 4096 LSB/g** until CTRL2 changes. See [lesson 08](./learn/08-imu-registers.md).
 
 ### Pointer
 An address of another object in memory.
@@ -130,7 +130,7 @@ Chip select: the SPI slave listens only while this line is active (usually low).
 
 ### CST816
 Capacitive touch controller (family S/T/D) on I2C.
-**In ESPET:** one finger, INT 48, RST 47, double-tap one-shot (lizard TBD). See [lesson 14](./learn/14-touch.md).
+**In ESPET:** CST816D (`ChipID` `0xB6`), I2C 0x15, one finger, INT 48, RST 47, `EnDClick` exists, mapping lizard TBD. Sim: click taps, drag is IMU. See [lesson 14](./learn/14-touch.md).
 
 ### DC
 Data/command pin for SPI LCDs. 0 = command, 1 = parameter or pixels.
@@ -170,7 +170,7 @@ Two-wire serial bus (SCL + SDA) with addressed slaves.
 
 ### I2C address
 7-bit name of a slave on the bus.
-**In ESPET:** IMU 0x6A/0x6B, touch 0x15, ES8311 0x18. See [cheatsheet](./learn/cheatsheet.md).
+**In ESPET:** QMI8658A 0x6B, CST816D 0x15, ES8311 0x18. ES7210 0x40 is present and stays uninitialized. See [cheatsheet](./learn/cheatsheet.md).
 
 ### I2S
 Serial bus for audio samples (clocks + data, not “files”).
@@ -226,7 +226,7 @@ Reset pin. Pulse it and the chip starts over.
 
 ### SA0
 Address-select pin on some I2C chips.
-**In ESPET:** QMI8658 0x6A vs 0x6B. Hello uses 0x6B. See [lesson 08](./learn/08-imu-registers.md).
+**In ESPET:** this QMI8658A answers only at **0x6B**. `0x6A` does not ACK. See [lesson 08](./learn/08-imu-registers.md).
 
 ### SCL
 I2C clock.
@@ -250,7 +250,7 @@ Clocked serial bus, usually one slave per CS, much faster than I2C.
 
 ### SPI mode
 Combination of clock polarity and phase (0…3).
-**In ESPET:** try 0, confirm vs 3 on glass. See [lesson 06](./learn/06-first-pixels.md).
+**In ESPET:** mode **3** at 80 MHz is clear on this glass. See [lesson 06](./learn/06-first-pixels.md).
 
 ### ST7789
 Sitronix LCD controller with on-panel GRAM. This module is the V2 variant, 240×240 window on 240×320 RAM.
@@ -266,7 +266,7 @@ Tearing-effect pin: the panel pulses at vblank.
 
 ### TRM
 Technical Reference Manual: how the SoC peripherals really work.
-**In ESPET:** [`esp32-s3_technical_reference_manual_en.pdf`](./soc/esp32-s3_technical_reference_manual_en.pdf). See [guide 02](./guides/02-soc-memory-smp.md).
+**In ESPET:** [`esp32-s3_technical_reference_manual_en.pdf`](https://github.com/jpgma/esp32-s3/blob/main/refs/soc/esp32-s3_technical_reference_manual_en.pdf) in **jpgma/esp32-s3**. See [guide 02](./guides/02-soc-memory-smp.md).
 
 ### UART
 Old-school serial port (TX/RX bytes).
