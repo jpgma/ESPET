@@ -14,7 +14,7 @@ Course: [learn/00](./learn/00-start-here.md) · [cheat sheet](./learn/cheatsheet
 
 ### Atomic
 A read or write the CPU treats as one step, with defined ordering between cores.
-**In ESPET:** `_Atomic` on seqlock index and `SfxEvt` ring pointers. See [lesson 03](./learn/03-tasks-cores-timing.md).
+**In ESPET:** `_Atomic` on the seqlock index. See [lesson 03](./learn/03-tasks-cores-timing.md).
 
 ### Bounce buffer
 A small DRAM array you fill just before DMA, instead of pointing DMA at a huge or unreachable buffer.
@@ -26,11 +26,11 @@ A promise you will not write this object. The compiler may put it in flash.
 
 ### DRAM
 Internal SRAM the CPU and most DMA can use without the PSRAM cache dance.
-**In ESPET:** framebuffers, mixer, seqlock, raster/blit inner loop. See [guide 02](./guides/02-soc-memory-smp.md).
+**In ESPET:** framebuffers, play buffer, seqlock, raster/blit inner loop. See [guide 02](./guides/02-soc-memory-smp.md).
 
 ### DRAM_ATTR
 IDF attribute that forces a symbol into internal DRAM.
-**In ESPET:** `g_shared[]`, `g_sfx[]`. See [lesson 03](./learn/03-tasks-cores-timing.md).
+**In ESPET:** `g_shared[]` and the play buffer. See [lesson 03](./learn/03-tasks-cores-timing.md).
 
 ### Endianness
 Byte order of a multi-byte number. Little-endian = least significant byte first.
@@ -38,7 +38,7 @@ Byte order of a multi-byte number. Little-endian = least significant byte first.
 
 ### Flash
 Non-volatile NOR memory the chip boots from. Slow to erase; can execute in place (XIP).
-**In ESPET:** 16 MB quad NOR, 80 MHz. This unit’s JEDEC ID is `0x204018` (XMC); the schematic text says W25Q128JVSIQ. Firmware, meshes, stamps, clips. No PCM in v1. See [lesson 13](./learn/13-power-and-boot.md).
+**In ESPET:** 16 MB quad NOR, 80 MHz. This unit’s JEDEC ID is `0x204018` (XMC); the schematic text says W25Q128JVSIQ. Firmware, meshes, stamps, bone clips, creature chirps (s8). See [lesson 13](./learn/13-power-and-boot.md).
 
 ### Heap
 Memory `malloc` hands out at runtime. Can fragment.
@@ -46,7 +46,7 @@ Memory `malloc` hands out at runtime. Can fragment.
 
 ### Hot path
 Code that runs every sample or every frame.
-**In ESPET:** Core 1 loop and the mixer. No STL, no flash reads for audio, no PSRAM in the raster. See [architecture 0](../architecture.md#0-product-lock).
+**In ESPET:** the Core 1 present loop. No STL. The raster inner loop stays in DRAM. A one-shot may read flash while the amp wakes; DMA then plays the DRAM buffer. See [architecture 0](../architecture.md#0-product-lock).
 
 ### int16_t
 Exactly 16-bit signed integer (−32768…32767).
@@ -62,11 +62,11 @@ An address of another object in memory.
 
 ### POD
 Plain Old Data: a struct of C types with no hidden constructors.
-**In ESPET:** `Bodies`, `ClipHdr`, `SynthPatch`, `SharedSnap`. See [lesson 01](./learn/01-c-for-firmware.md).
+**In ESPET:** `Bodies`, `ClipHdr`, `ImpactPatch`, `ChirpHdr`, `SharedSnap`. See [lesson 01](./learn/01-c-for-firmware.md).
 
 ### PSRAM
 Extra RAM outside the CPU die, reached through a cache (here 8 MB octal in-package).
-**In ESPET:** optional cold copies only. Never the framebuffer, the pose, the mixer, or Wi-Fi DMA. Meshes stay XIP. No backdrop. See [guide 02](./guides/02-soc-memory-smp.md).
+**In ESPET:** optional cold copies only. Never the framebuffer, the pose, the play buffer, or Wi-Fi DMA. Meshes stay XIP. No backdrop. See [guide 02](./guides/02-soc-memory-smp.md).
 
 ### Q8
 Fixed-point format: stored_integer / 256 = real value.
@@ -302,7 +302,7 @@ Xtensa cycle counter. Cheap high-resolution clock.
 
 ### Core
 One CPU of the dual LX7.
-**In ESPET:** Core 0 sensors/mixer; Core 1 body. See [lesson 03](./learn/03-tasks-cores-timing.md).
+**In ESPET:** Core 0 sensors and sim; Core 1 body. See [lesson 03](./learn/03-tasks-cores-timing.md).
 
 ### FreeRTOS
 Tiny real-time OS IDF is built on (tasks, queues, delays).
@@ -322,7 +322,7 @@ Forcing a task to always run on one core.
 
 ### Priority
 RTOS ranking. Higher runs first when both are ready.
-**In ESPET:** IMU 12, touch 11, mixer 7, house 5. See [architecture 4](../architecture.md#4-core-allocation).
+**In ESPET:** I2C owner 13, IMU filter 12, sim 6, house 5. See [architecture 4](../architecture.md#4-core-allocation).
 
 ### Seqlock
 A sequence-number lock: writer bumps a counter; reader retries if it changed mid-copy.
@@ -334,7 +334,7 @@ Symmetric multiprocessing: two CPUs, one memory.
 
 ### SPSC
 Single-producer single-consumer queue.
-**In ESPET:** `SfxEvt` ring, overwrite-oldest. See [lesson 12](./learn/12-clips-springs-hitboxes.md).
+**In ESPET:** sound is not queued. The sim writes the play buffer on the tick. See [lesson 15](./learn/15-audio.md).
 
 ### Task
 A function that looks like it has its own `for(;;)` and stack, scheduled by FreeRTOS.
@@ -636,39 +636,47 @@ Chip that turns I2S numbers into analog (or the reverse).
 **In ESPET:** ES8311 DAC. See [lesson 15](./learn/15-audio.md).
 
 ### Mixer
-Sums voices into one sample stream.
-**In ESPET:** Core 0, two voices, 12 kHz, block 256. See [lesson 15](./learn/15-audio.md).
+Sums sources into one sample stream.
+**In ESPET:** no mixer task. A second class adds into the play buffer at the event. See [lesson 15](./learn/15-audio.md).
 
 ### PA
 Power amplifier for the speaker.
-**In ESPET:** NS4150B, GPIO7 high only while a voice is live. See [lesson 15](./learn/15-audio.md).
+**In ESPET:** NS4150B, GPIO7 high only while DMA is running. See [lesson 15](./learn/15-audio.md).
 
 ### PCM
 Stored waveform samples.
-**In ESPET:** none in v1. Procedural patches. Pak has a reserved PCM appendix. See [lesson 15](./learn/15-audio.md).
+**In ESPET:** creature chirps are s8 in flash, expanded into the `int16` play buffer at the event. Impacts are procedural. No MP3, no streaming. See [lesson 15](./learn/15-audio.md).
+
+### Play buffer
+One DRAM array DMA reads while the CPU does something else.
+**In ESPET:** 12 kHz mono `int16`, 300 ms, 7200 bytes. Internal, DMA-capable. See [lesson 15](./learn/15-audio.md).
 
 ### Procedural audio
 Sound generated by oscillators/noise, not a wav file.
-**In ESPET:** `SynthPatch` 16 bytes. See [lesson 15](./learn/15-audio.md).
+**In ESPET:** impacts only. `ImpactPatch` is 8 bytes. See [lesson 15](./learn/15-audio.md).
 
 ### SfxEvt
-Tiny event: patch id, velocity, tag.
-**In ESPET:** sim → mixer ring, both on Core 0. The sim does not call the mixer. See [lesson 12](./learn/12-clips-springs-hitboxes.md).
+Tiny event: class, id, velocity.
+**In ESPET:** the sim renders it on that tick. At most one impact and one chirp. Not a ring. See [lesson 12](./learn/12-clips-springs-hitboxes.md).
 
-### SynthPatch
-POD describing one sound.
-**In ESPET:** flash → DRAM at boot. See [lesson 15](./learn/15-audio.md).
+### ImpactPatch
+POD describing one thud: decay, one-pole Hz, gain, how velocity scales it.
+**In ESPET:** 8 bytes in flash. See [lesson 15](./learn/15-audio.md).
+
+### ChirpHdr
+Header for one baked creature line. `s8` samples follow in the pak.
+**In ESPET:** effort / yelp / happy / sleepy. `n` ≤ 3600. See [lesson 15](./learn/15-audio.md).
 
 ### Tail
-The decay after a note, before silence.
-**In ESPET:** finish tail before PA low / light-sleep (~800 ms cap). See [lesson 16](./learn/16-sleep-and-battery.md).
+Samples still ahead of the DMA read pointer.
+**In ESPET:** sleep waits for TX-done, then PA low. The cap is the 300 ms buffer. See [lesson 16](./learn/16-sleep-and-battery.md).
 
 ### Voice
-One mixer slot. Last event of that class wins.
-**In ESPET:** A = impact, B = creature. See [lesson 15](./learn/15-audio.md).
+One class sharing the play buffer. Last event of that class wins.
+**In ESPET:** impact = procedural thud. Creature = baked chirp. See [lesson 15](./learn/15-audio.md).
 
 ### vox_id
-Patch to play when a clip **starts**. 0 = silent.
+Chirp to render when a clip **starts**. 0 = silent.
 **In ESPET:** on `ClipHdr`, not a parallel lizard trigger. See [lesson 12](./learn/12-clips-springs-hitboxes.md).
 
 ---
@@ -685,7 +693,7 @@ Charger status pin.
 
 ### Deep sleep
 CPU off; only RTC and configured pads live.
-**In ESPET:** after tail, PA low, `BAT_EN` held. See [lesson 16](./learn/16-sleep-and-battery.md).
+**In ESPET:** after TX-done, PA low, `BAT_EN` held. See [lesson 16](./learn/16-sleep-and-battery.md).
 
 ### ETA6098
 Switching Li-ion charger IC. No I2C map.
@@ -693,7 +701,7 @@ Switching Li-ion charger IC. No I2C map.
 
 ### Light sleep
 CPU paused, peripherals gated; faster wake than deep sleep.
-**In ESPET:** only if mixer idle. See [lesson 16](./learn/16-sleep-and-battery.md).
+**In ESPET:** only if DMA is idle and the PA is down. See [lesson 16](./learn/16-sleep-and-battery.md).
 
 ### PMIC
 Power-management IC with I2C (e.g. AXP).

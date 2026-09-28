@@ -11,7 +11,7 @@ Keep this open while coding. Pins and schematic: [jpgma/esp32-s3 HARDWARE.md](ht
 5. Meshes are appearance. The core spring is state. Bone clips are appearance. Pixels are not physics.
 6. Clips write bone locals. The core spring only lags the body. Appendages do not spring.
 7. The camera is room-authored and static until a clip sets `full_frame`. IMU tilt does not orbit.
-8. Core 1 never plays audio. The sim on Core 0 may emit `SfxEvt`. Core 0 mixes.
+8. Core 1 never plays audio. The sim on Core 0 renders one-shots into the play buffer. I2S DMA plays it.
 
 ## Pins (thin)
 
@@ -59,7 +59,7 @@ C++: `-fno-exceptions -fno-rtti`. IDF ≥ 5.5.
 
 - One indexed-8 FB in DRAM (57.6 KB). Two 8-row RGB565 DMA bands (7.7 KB). Triangle scratch ~32 KB.
 - **Room palette** 256 (512 B), copy on door. Index 0 = key; 1–63 actor **ramps**; 64–255 room.
-- Mixer and raster never touch PSRAM. No backdrop.
+- Raster inner loop never touches PSRAM. Play buffer is DRAM (7.2 KB). No backdrop.
 - Meshes and the weighted pet: flash XIP. Shadow/FX stamps: flash. Pose mailbox in DRAM (six bone 3×4s).
 - Awake rigids ≤ 24. `FxPool` 256 stamps. Empty SPI mask when the pose matches.
 - RTC: hunger/happy/sleep/emotion/`room_id`. 8 h is parked.
@@ -70,7 +70,7 @@ C++: `-fno-exceptions -fno-rtti`. IDF ≥ 5.5.
 | :--- | :--- |
 | IMU + filter | 100 Hz |
 | Sim (Core 0) and present (Core 1) | 30 Hz (33.3 ms deadline) |
-| Mixer | 12 kHz, 256-sample blocks |
+| Play buffer | 12 kHz, 300 ms, DMA |
 | Lizard (later) | 20 Hz |
 | Housekeeping | 1–10 Hz |
 

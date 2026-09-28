@@ -4,7 +4,7 @@
 
 **Read:** [architecture 6](../../architecture.md#6-runtime-representation) · [architecture 7](../../architecture.md#7-clips-animation-writes-bone-locals) · [architecture 8](../../architecture.md#8-physics-and-hitboxes) · golden rules 5–8
 
-**Code:** one `CoreSpring`, six bone locals, FK, one debug clip (wave on the arm bone), joint spheres, poke as a function you can call from a fake tap. `SfxEvt` ring: push on impulse, never block.
+**Code:** one `CoreSpring`, six bone locals, FK, one debug clip (wave on the arm bone), joint spheres, poke as a function you can call from a fake tap. On an impulse, record one impact. Do not queue sound.
 
 ## The contract
 
@@ -33,7 +33,7 @@ Gaze: additive local rotation on the head bone after the clip sample. S rooms.
 
 ## Clips
 
-`ClipHdr`: id, bone_mask, frame_count, fps (~15), duration, `vox_id` (0 = silent), `full_frame`. Packed `int16` local rotation (and optional translation). Playback: lerp two keys, write `local_q`. Missing mask bits keep the bind local.
+`ClipHdr`: id, bone_mask, frame_count, fps (~15), duration, `vox_id` (0 = silent chirp), `full_frame`. Packed `int16` local rotation (and optional translation). Playback: lerp two keys, write `local_q`. Missing mask bits keep the bind local. A non-zero `vox_id` is the chirp to render when the clip starts.
 
 Do **not** export a mesh per clip frame. A wave is the arm bone rotating. Vertices with two influences bend with it.
 
@@ -50,21 +50,21 @@ This lesson is **S** (Nest or Play): core vs floor/walls/toys; arm joints vs toy
 
 Poke (S): unproject tap through `inv(proj*view)`, ray vs joint spheres, closest hit. Miss → floor ray. Sim: mouse click can feed UV until CST816 exists.
 
-Squish: core penetration → non-uniform `core.scale`, ~100 ms recover. Push squish patch on voice A if closing speed beats threshold.
+Squish: core penetration → non-uniform `core.scale`, ~100 ms recover. Render an impact if closing speed beats the threshold.
 
 Shake: impulse on the core (and awake rigids). Not on five limb springs — those are gone. A clip may also set `full_frame` if the camera should shake.
 
-## `SfxEvt`
+## Sound
 
-[SfxEvt](../glossary.md#sfxevt) is overwrite-oldest, size 8. The sim pushes; it does not call the mixer. Fields: `id`, `vel`, `tag`. Threshold + ~150–250 ms cooldown **per pair**.
+[SfxEvt](../glossary.md#sfxevt) is class, id, and `vel`. The sim renders it on that tick: at most one impact and one chirp. Threshold + ~150–250 ms cooldown **per pair**. Silicon writes the [play buffer](../glossary.md#play-buffer). This lesson only logs the event.
 
 ## Sim gap
 
-No dual-core, no real mixer. Still: a pose slot, `g_sfx[]` ring, and a present loop that does not “call mix().” When the mailbox exists, a stalled publisher holds the last pose.
+No dual-core, no codec. Still: a pose slot, and a present loop that does not render audio. When the mailbox exists, a stalled publisher holds the last pose.
 
 ## Checkpoint (sim)
 
-Idle pet. Fire debug `clip_id` = wave: the arm bone rotates, the mesh bends, the core spring does not have to rise for the hand to move. Joint debug spheres. Fake poke hits a sphere, not a pixel. A floor or toy hit logs `SfxEvt` with cooldown. The room does **not** orbit.
+Idle pet. Fire debug `clip_id` = wave: the arm bone rotates, the mesh bends, the core spring does not have to rise for the hand to move. Joint debug spheres. Fake poke hits a sphere, not a pixel. A floor or toy hit logs one impact with cooldown. The room does **not** orbit.
 
 ## When the board arrives
 

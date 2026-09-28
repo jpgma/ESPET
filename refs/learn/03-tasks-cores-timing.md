@@ -18,12 +18,12 @@ When IDF boots, it calls `app_main`. In [firmware/main.c](../../firmware/main.c)
 
 | Core | What |
 | :--- | :--- |
-| **0** | [IMU](../glossary.md#imu) 100 Hz, touch [IRQ](../glossary.md#irq), lizard 20 Hz, **sim** (core spring, bones, rigids, particles), mixer, backlight, optional Wi-Fi |
+| **0** | [IMU](../glossary.md#imu) 100 Hz, touch [IRQ](../glossary.md#irq), lizard 20 Hz, **sim** (core spring, bones, rigids, particles, one-shots), backlight, optional Wi-Fi |
 | **1** | One pinned task: load pose → interpolate to the deadline → skin + raster → dirty SPI. No physics |
 
 **Golden rule 1:** Core 1 never waits on Core 0, Wi-Fi, or the LLM.
 
-[Pinning](../glossary.md#pinning): `xTaskCreatePinnedToCore(..., 1)` so present never migrates. Priorities: IMU 12, touch 11, mixer 7, **sim 6** (under the mixer), housekeeping 5. Wi-Fi (when on) sits high inside IDF. A long rigid-body solve must not starve I2S.
+[Pinning](../glossary.md#pinning): `xTaskCreatePinnedToCore(..., 1)` so present never migrates. Priorities: I2C owner 13, IMU filter 12, **sim 6**, housekeeping 5. Wi-Fi (when on) sits high inside IDF. Playback is DMA, so a long rigid-body solve does not starve I2S.
 
 `board-sim` today: **one thread**. Write the code as if two cores exist. A seqlock still works with one reader and one writer on the same thread; you will feel the split when the sim grows.
 
@@ -66,11 +66,11 @@ Odd `seq` = write in progress. Two slots so the writer can fill the other one.
 
 **[`volatile`](../glossary.md#volatile) is not a barrier** on [SMP](../glossary.md#smp) Xtensa. Use `_Atomic` / `atomic_load` / `atomic_store` (architecture §5).
 
-Sound stays on Core 0. The sim pushes `SfxEvt` into an 8-deep ring and does not call the mixer. If the ring is full, drop oldest. The mixer is higher priority than the sim.
+Sound stays on Core 0. The sim renders at most one impact and one chirp into the [play buffer](../glossary.md#play-buffer) on that tick, then returns. I2S DMA plays the buffer. There is no mixer task.
 
 ## `DRAM_ATTR`
 
-The pose, the indexed frame, and the DMA bands live in internal [DRAM](../glossary.md#dram), not [PSRAM](../glossary.md#psram). Wi-Fi DMA cannot live in PSRAM. The raster inner loop never touches PSRAM. See [guide 02](../guides/02-soc-memory-smp.md).
+The pose, the indexed frame, the DMA bands, and the play buffer live in internal [DRAM](../glossary.md#dram), not [PSRAM](../glossary.md#psram). Wi-Fi DMA cannot live in PSRAM. The raster inner loop never touches PSRAM. See [guide 02](../guides/02-soc-memory-smp.md).
 
 ## Checkpoint
 
