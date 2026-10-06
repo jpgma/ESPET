@@ -31,7 +31,7 @@ Start `kp` small (try 0.5–2). Too large: accel noise on `q`. Too small: slow t
 
 ## dt
 
-Sim: whatever time you actually waited (33 ms if you still sample in the display loop — **wrong rate**). Better: run the filter on every IMU read. If you still poll in the 30 Hz loop, `dt = 0.033` and the filter will feel sluggish. Split a 100 Hz-ish loop even on one thread (`dt = 0.01`) and let display stay 30 Hz. Architecture wants 100 Hz on Core 0.
+Sim: whatever time you actually waited (the present period, if you still sample in the display loop — **wrong rate**). Better: run the filter on every IMU read. If you still poll in the present loop, `dt` is the frame time and the filter will feel sluggish. Split a 100 Hz-ish loop even on one thread (`dt = 0.01`) and let display run at the glass ceiling. Architecture wants 100 Hz on Core 0.
 
 ## Debug overlay (studio only)
 

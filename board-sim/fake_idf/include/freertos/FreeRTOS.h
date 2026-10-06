@@ -9,6 +9,11 @@ extern "C" {
 
 typedef uint32_t TickType_t;
 typedef void *TaskHandle_t;
+typedef int BaseType_t;
+typedef unsigned UBaseType_t;
+typedef void (*TaskFunction_t)(void *);
+
+#define pdPASS ((BaseType_t)1)
 
 #define configTICK_RATE_HZ 1000
 #define portTICK_PERIOD_MS 1

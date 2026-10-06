@@ -19,12 +19,17 @@ esp_err_t esp_lcd_new_panel_io_spi(spi_host_device_t host,
                                    esp_lcd_panel_io_handle_t *ret_io)
 {
     (void)host;
-    (void)io_config;
     if (!ret_io) {
         return ESP_ERR_INVALID_ARG;
     }
     *ret_io = calloc(1, sizeof(struct esp_lcd_panel_io_t));
-    return *ret_io ? ESP_OK : ESP_FAIL;
+    if (!*ret_io) {
+        return ESP_FAIL;
+    }
+    if (io_config && io_config->pclk_hz > 0) {
+        board_sim_adopt_spi_hz(io_config->pclk_hz);
+    }
+    return ESP_OK;
 }
 
 esp_err_t esp_lcd_new_panel_st7789(esp_lcd_panel_io_handle_t io,
@@ -68,8 +73,11 @@ esp_err_t esp_lcd_panel_draw_bitmap(esp_lcd_panel_handle_t panel, int x_start, i
         return ESP_OK;
     }
     const size_t pixels = (size_t)(x_end - x_start) * (size_t)(y_end - y_start);
-    board_sim_gram_blit(x_start, y_start, x_end, y_end, (const uint16_t *)color_data);
+    const int frame_done = board_sim_gram_blit(x_start, y_start, x_end, y_end, (const uint16_t *)color_data);
     board_sim_spi_delay_pixels(pixels);
+    if (frame_done) {
+        board_sim_frame_commit();
+    }
     return ESP_OK;
 }
 

@@ -20,6 +20,11 @@ typedef enum {
     LCD_RGB_ELEMENT_ORDER_BGR = 1,
 } lcd_rgb_element_order_t;
 
+typedef enum {
+    LCD_RGB_DATA_ENDIAN_BIG = 0,
+    LCD_RGB_DATA_ENDIAN_LITTLE = 1,
+} lcd_rgb_data_endian_t;
+
 typedef struct {
     int cs_gpio_num;
     int dc_gpio_num;
@@ -33,6 +38,7 @@ typedef struct {
 typedef struct {
     int reset_gpio_num;
     lcd_rgb_element_order_t rgb_ele_order;
+    lcd_rgb_data_endian_t data_endian;
     uint32_t bits_per_pixel;
     struct {
         unsigned int reset_active_high : 1;

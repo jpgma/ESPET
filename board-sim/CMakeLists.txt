@@ -23,24 +23,36 @@ FetchContent_MakeAvailable(SDL2)
 
 add_library(board_sim_hw STATIC
     src/gram.c
+    src/pace.c
     src/imu.c
     src/touch.c
     fake_idf/src/esp_lcd.c
     fake_idf/src/i2c_master.c
     fake_idf/src/gpio.c
+    fake_idf/src/ledc.c
     fake_idf/src/freertos.c
+    "${ESPET_ROOT}/firmware/board_backlight/board_backlight.c"
 )
 target_include_directories(board_sim_hw PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/fake_idf/include"
+    "${ESPET_ROOT}/firmware"
+    "${ESPET_ROOT}/firmware/board_backlight/include"
 )
+if(WIN32)
+    target_link_libraries(board_sim_hw PUBLIC powrprof)
+endif()
 
 add_library(espet_firmware STATIC
-    "${ESPET_ROOT}/firmware/main.c"
+    "${ESPET_ROOT}/firmware/main/main.c"
+    "${ESPET_ROOT}/firmware/main/win32/platform.c"
 )
 target_include_directories(espet_firmware PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/fake_idf/include"
     "${ESPET_ROOT}/firmware"
+    "${ESPET_ROOT}/firmware/main"
+    "${ESPET_ROOT}/firmware/main/win32"
+    "${ESPET_ROOT}/firmware/board_backlight/include"
 )
 target_link_libraries(espet_firmware PRIVATE board_sim_hw)
 

@@ -2,13 +2,13 @@
 
 ← [00 start](./00-start-here.md) · [index](./00-start-here.md) · [glossary](../glossary.md) · [cheat sheet](./cheatsheet.md) · [next: 02 How chips talk](./02-how-chips-talk.md) →
 
-**Read:** [architecture 0 (style)](../../architecture.md#0-product-lock) · [firmware/main.c](../../firmware/main.c)
+**Read:** [architecture 0 (style)](../../architecture.md#0-product-lock) · [firmware/main/main.c](../../firmware/main/main.c)
 
 You will write C that looks like a better C++: no exceptions, no RTTI, no STL in the hot path. This lesson is the language, not the chip.
 
 ## Why firmware C feels different
 
-A desktop program can ask the OS for more memory, throw an error, and print a stack trace. On the ESP32 there is **no spare heap in the 33 ms loop**, no exception unwind, and a bug often means a reboot. You pick sizes at compile time. You check return codes.
+A desktop program can ask the OS for more memory, throw an error, and print a stack trace. On the ESP32 there is **no spare heap in the present loop**, no exception unwind, and a bug often means a reboot. You pick sizes at compile time. You check return codes.
 
 ESPET style from architecture: [POD](../glossary.md#pod) tables, integer IDs, as little abstraction as the hardware forces.
 
@@ -49,7 +49,7 @@ uint16_t *p = s_fb;                /* address of pixel 0 */
 p[y * 240 + x] = color;            /* same as s_fb[y * 240 + x] */
 ```
 
-`s_fb` in [firmware/main.c](../../firmware/main.c) is a full RGB565 frame. Lesson 07 will shrink that to indexed-8.
+The example above is a full RGB565 frame. [firmware/main/main.c](../../firmware/main/main.c) is already indexed-8. Lesson 07 is that budget.
 
 If you pass an array to a function, you also pass a **count**. C will not stop you from walking off the end.
 
@@ -108,7 +108,7 @@ The ESP32-S3 CPU is also little-endian, so this matches RAM. The cortex UDP pack
 
 ## Static allocation
 
-`s_fb` is a global (actually `static` at file scope). It lives for the whole program. In the frame loop you do **not** call `malloc`. Heap fragmentation plus a 33 ms deadline is how toys freeze.
+`s_fb` is a global (actually `static` at file scope). It lives for the whole program. In the frame loop you do **not** call `malloc`. Heap fragmentation in the present loop is how toys freeze.
 
 `static` on a function-local variable means “one copy, lives forever,” not “this function only.” `static` on a function or file-scope name means “not visible to other `.c` files.”
 
@@ -122,7 +122,7 @@ C++ as better C: you may use `constexpr`, references in helpers, and `enum class
 
 ## Exercise (no new files yet)
 
-Open [firmware/main.c](../../firmware/main.c). For each of these, write a one-line comment in a notebook (not necessarily in the file):
+Open [firmware/main/main.c](../../firmware/main/main.c). For each of these, write a one-line comment in a notebook (not necessarily in the file):
 
 1. Why is `s_fb` `uint16_t` and not `uint8_t`? (Lesson 07 will change this.)
 2. What does `1ull << PIN_LCD_BL` mean?

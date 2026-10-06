@@ -42,7 +42,7 @@ Non-volatile NOR memory the chip boots from. Slow to erase; can execute in place
 
 ### Heap
 Memory `malloc` hands out at runtime. Can fragment.
-**In ESPET:** not in the 33 ms hot path. Prefer static/`DRAM_ATTR` buffers. See [lesson 01](./learn/01-c-for-firmware.md).
+**In ESPET:** not in the present hot path. Prefer static/`DRAM_ATTR` buffers. See [lesson 01](./learn/01-c-for-firmware.md).
 
 ### Hot path
 Code that runs every sample or every frame.
@@ -262,7 +262,7 @@ A GPIO sampled *at reset* to choose boot mode or voltages.
 
 ### TE
 Tearing-effect pin: the panel pulses at vblank.
-**In ESPET:** **no TE**. 30 FPS is software. See [lesson 06](./learn/06-first-pixels.md).
+**In ESPET:** **no TE**. Present is software. The ceiling is the glass, 80 Hz (12500 µs), not a 30 FPS cap. See [lesson 06](./learn/06-first-pixels.md).
 
 ### TRM
 Technical Reference Manual: how the SoC peripherals really work.
@@ -298,7 +298,7 @@ A call that waits until something happens (`vTaskDelay`, I2C complete).
 
 ### CCOUNT
 Xtensa cycle counter. Cheap high-resolution clock.
-**In ESPET:** lock the 33.3 ms frame. See [lesson 03](./learn/03-tasks-cores-timing.md).
+**In ESPET:** time the present against the 12500 µs glass ceiling. See [lesson 03](./learn/03-tasks-cores-timing.md).
 
 ### Core
 One CPU of the dual LX7.
@@ -390,7 +390,7 @@ ST7789 colour-mode command. `0x55` = RGB565.
 
 ### Dirty rect
 The smallest rectangle that changed and must be sent to the panel.
-**In ESPET:** why 30 FPS is possible at 40 MHz SPI. See [lesson 07](./learn/07-indexed-framebuffer.md).
+**In ESPET:** a still pose ships nothing. A full frame is already ~12.3 ms of wire. See [lesson 07](./learn/07-indexed-framebuffer.md).
 
 ### Dodecahedron
 A 12-face solid whose 20 vertices are evenly spaced directions.
@@ -402,7 +402,7 @@ Field of view of the perspective camera.
 
 ### FPS
 Frames per second.
-**In ESPET:** cap 30. Core 0 simulates and Core 1 presents on the same 33.3 ms deadline. See [lesson 03](./learn/03-tasks-cores-timing.md).
+**In ESPET:** no locked cap. Glass ceiling 80 Hz. Core 0 sim stays on its own clock. Core 1 presents up to the glass. See [lesson 03](./learn/03-tasks-cores-timing.md).
 
 ### FX
 Event specks (dust, crumbs, leaves). Point masses, not a GPU. No alpha.
@@ -438,7 +438,7 @@ ST7789 memory-access-control: axis flip and RGB vs BGR.
 
 ### Occluder
 A mesh the pet can walk behind (plant, furniture). It is part of the live room, not a hole in a photograph.
-**In ESPET:** painter's order, far to near, inside the ~1024 triangle cap. See [architecture 10](../architecture.md#room).
+**In ESPET:** painter's order, far to near, inside the 1024 triangle cap. See [architecture 10](../architecture.md#room).
 
 ### Palette
 Table mapping index → RGB565.
@@ -712,7 +712,7 @@ Power button.
 **In ESPET:** GPIO5, long-press latch off. See [lesson 13](./learn/13-power-and-boot.md).
 
 ### Studio mode
-USB plugged in: bright, 30 FPS, no light-sleep, cortex allowed.
+USB plugged in: bright, glass ceiling, no light-sleep, cortex allowed.
 **In ESPET:** architecture §14. See [lesson 16](./learn/16-sleep-and-battery.md).
 
 ### VBAT
@@ -725,7 +725,7 @@ Battery voltage.
 
 ### app_main
 Your entry after IDF init. Already a FreeRTOS task.
-**In ESPET:** [`firmware/main.c`](../firmware/main.c). See [lesson 06](./learn/06-first-pixels.md).
+**In ESPET:** [`firmware/main/main.c`](../firmware/main/main.c). See [lesson 06](./learn/06-first-pixels.md).
 
 ### Arduino
 Hobby framework on top of similar chips.

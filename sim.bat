@@ -48,8 +48,10 @@ echo   sim.bat --run-only      skip build; start the last exe
 echo   sim.bat --help          this text
 echo   debug.bat               open the solution in Visual Studio ^(F5^)
 echo.
-echo Optional env: set BOARD_SIM_SPI_HZ=40000000
-echo   (fake SPI duration on draw_bitmap; unset = off)
+echo SPI wire time follows the firmware pclk. Optional override:
+echo   set BOARD_SIM_SPI_HZ=40000000
+echo CPU stretch is coarse. A sim overrun is not the silicon pass bar.
+echo   set BOARD_SIM_CPU_HZ=0   turns the stretch off
 echo.
 echo Firmware lives in firmware\  (no SDL^). The window is board-sim\ only.
 exit /b 0
@@ -148,6 +150,6 @@ if "!DO_RUN!"=="0" (
 )
 
 echo Running !EXE!
-echo Drag in the window to tilt the fake IMU. Close the window to quit.
+echo Click taps the fake CST816. Drag past a few pixels tilts the fake IMU.
 "!EXE!"
 exit /b %ERRORLEVEL%

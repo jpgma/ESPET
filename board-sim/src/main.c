@@ -11,9 +11,39 @@ void app_main(void);
 
 static uint16_t s_present[BOARD_SIM_LCD_W * BOARD_SIM_LCD_H];
 
+static void format_spi(char *dst, size_t n, int hz)
+{
+    if (hz <= 0) {
+        snprintf(dst, n, "—");
+    } else if (hz % 1000000 == 0) {
+        snprintf(dst, n, "%d MHz", hz / 1000000);
+    } else {
+        snprintf(dst, n, "%d Hz", hz);
+    }
+}
+
+static void format_title(char *dst, size_t n)
+{
+    board_sim_frame_stats_t st;
+    board_sim_frame_stats(&st);
+    char spi[32];
+    format_spi(spi, sizeof(spi), board_sim_spi_hz());
+    if (!st.fps_valid) {
+        snprintf(dst, n, "espet  raster  0 fps  —  slack —  spi %s", spi);
+        return;
+    }
+    if (!st.period_valid) {
+        snprintf(dst, n, "espet  raster  %.0f fps  —  slack —  spi %s", st.fps, spi);
+        return;
+    }
+    snprintf(dst, n, "espet  raster  %.0f fps  %.0f ms  slack %+.0f ms  spi %s",
+             st.fps, st.period_ms, st.slack_ms, spi);
+}
+
 static int firmware_thread(void *unused)
 {
     (void)unused;
+    board_sim_cpu_arm();
     app_main();
     return 0;
 }
@@ -39,11 +69,12 @@ int main(int argc, char **argv)
 
     const char *spi = getenv("BOARD_SIM_SPI_HZ");
     board_sim_gram_init();
+    board_sim_cpu_init();
     board_sim_imu_init();
     board_sim_touch_init();
     if (spi && spi[0]) {
         board_sim_set_spi_hz(atoi(spi));
-        printf("board-sim: SPI tax %d Hz\n", board_sim_spi_hz());
+        printf("board-sim: SPI override %d Hz\n", board_sim_spi_hz());
     }
 
     SDL_SetMainReady();
@@ -56,8 +87,10 @@ int main(int argc, char **argv)
 
     const int win_w = BOARD_SIM_LCD_W * BOARD_SIM_SCALE;
     const int win_h = BOARD_SIM_LCD_H * BOARD_SIM_SCALE;
+    char title[160];
+    format_title(title, sizeof(title));
     SDL_Window *win = SDL_CreateWindow(
-        "Waveshare ESP32-S3-Touch-LCD-1.54 (sim)",
+        title,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         win_w, win_h, SDL_WINDOW_SHOWN);
     if (!win) {
@@ -98,8 +131,12 @@ int main(int argc, char **argv)
     int last_x = 0, last_y = 0;
     Uint32 last_drag_ms = SDL_GetTicks();
     Uint32 last_tick_ms = last_drag_ms;
+    Uint32 last_title_ms = last_drag_ms;
     Uint32 last_tap_ms = 0;
     int running = 1;
+
+    printf("keys: click taps the fake CST816. Drag past a few pixels tilts the fake IMU.\n");
+    fflush(stdout);
 
     while (running) {
         const Uint32 frame_start = SDL_GetTicks();
@@ -157,6 +194,11 @@ int main(int argc, char **argv)
         }
 
         const Uint32 now = SDL_GetTicks();
+        if (now - last_title_ms >= 1000) {
+            last_title_ms = now;
+            format_title(title, sizeof(title));
+            SDL_SetWindowTitle(win, title);
+        }
         float tick_dt = (now - last_tick_ms) / 1000.0f;
         last_tick_ms = now;
         if (!imu_drag) {

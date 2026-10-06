@@ -8,7 +8,7 @@ Hardware bible (pins, schematic, datasheets, hello + `board-sim`): **[jpgma/esp3
 
 | Folder | What it is |
 | :--- | :--- |
-| [`firmware/`](firmware/) | The program that will run on the ESP32. Talks to the LCD (`esp_lcd`), IMU (I2C QMI8658), and CST816 (I2C, INT). Habitat meshes raster here. **No SDL, no mouse, no cube renderer in the simulator.** |
+| [`firmware/`](firmware/) | The program that will run on the ESP32. The raster stub paints an indexed frame. Habitat meshes raster here. **No SDL, no mouse, no cube renderer in the simulator.** |
 | [`board-sim/`](board-sim/) | A fake Waveshare: 240×240 ST7789 window, mouse-drag → QMI8658, **click → CST816** at 0x15. Your firmware does not know this exists. |
 
 The rooms, springs, meshes, and pet are firmware work you add later. The simulator never draws a habitat and never rasterizes a cube.
@@ -21,7 +21,7 @@ You already have Visual Studio 18. `sim.bat` looks up an install that has the **
 sim.bat
 ```
 
-That configures if needed, builds **Release**, and opens the panel. First run downloads SDL2 (needs network once). To step through firmware in the IDE (breakpoints in `firmware/main.c`):
+That configures if needed, builds **Release**, and opens the panel. First run downloads SDL2 (needs network once). To step through firmware in the IDE (breakpoints in `firmware/main/main.c`):
 
 ```text
 debug.bat
@@ -39,14 +39,16 @@ That opens the generated solution (`build-sim\espet-board-sim.slnx` on VS 18) in
 | `sim.bat --help` | flags |
 | `debug.bat` | open the sim in Visual Studio for F5 debugging |
 
-Optional fake SPI cost (off by default):
+SPI wire time follows the firmware `pclk_hz` (80 MHz). `BOARD_SIM_SPI_HZ` overrides it. The title shows fps, frame period, slack against 12.5 ms, and the SPI clock. CPU stretch toward 240 MHz is coarse. A sim overrun is not the silicon pass bar.
 
 ```text
 set BOARD_SIM_SPI_HZ=40000000
 sim.bat
 ```
 
-**Click** (little or no move) taps the fake CST816 — hello logs XY and paints a yellow speck. **Drag** past a few pixels tilts the fake IMU. The hello firmware tints the screen from accel and draws a white bar from gyro rate so you can see both axes.
+The stub paints a steady indexed field. PLUS and BOOT step the palette on the board. **Click** (little or no move) taps the fake CST816. This firmware does not read that tap yet. **Drag** past a few pixels tilts the fake IMU.
+
+Raster tasks: [docs/raster](docs/raster/README.md).
 
 ## Real board
 

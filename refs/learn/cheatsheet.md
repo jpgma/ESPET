@@ -7,7 +7,7 @@ Keep this open while coding. Pins and schematic: [jpgma/esp32-s3 HARDWARE.md](ht
 1. Core 1 never waits on Core 0, Wi-Fi, or the LLM.
 2. The pet is complete with the radio off.
 3. World down is real gravity. The screen is a camera, not a world axis.
-4. Sleeping the CPU is a feature. Idle I2S clocks or PA up is the same bug as a static 30 Hz SPI.
+4. Sleeping the CPU is a feature. Idle I2S clocks or PA up is the same bug as a still frame that still ships SPI.
 5. Meshes are appearance. The core spring is state. Bone clips are appearance. Pixels are not physics.
 6. Clips write bone locals. The core spring only lags the body. Appendages do not spring.
 7. The camera is room-authored and static until a clip sets `full_frame`. IMU tilt does not orbit.
@@ -34,7 +34,7 @@ GPIO18 is TF D1 — not a spare. TF unused. No RTC IC.
 
 I2C: QMI8658 **0x6B**, CST816 **0x15**, ES8311 **0x18**, ES7210 **0x40 never probe**.
 
-SPI: **mode 3, 80 MHz**, picture clear. GRAM 240×320, window 240×240. Full RGB565 ≈ **12.3 ms** measured → 30 FPS still wants dirty-rect, with ~21 ms left in the 33 ms budget.
+SPI: **mode 3, 80 MHz**, picture clear. GRAM 240×320, window 240×240. Full RGB565 ≈ **12.3 ms** measured. Dirty rows stay. A still pose ships nothing. The present ceiling is 80 Hz (12500 µs).
 
 Backlight LED typical **60 mA @ 3.0 V** — battery PWM **30–40%**. LEDC 5 kHz / 10-bit to start.
 
@@ -49,7 +49,7 @@ CONFIG_SPIRAM_SPEED_80M=y
 # quad flash 80 MHz, not OPI
 CONFIG_FREERTOS_HZ=1000
 # Bluetooth off
-# Wi-Fi only in cortex mode
+# Wi-Fi started (heap test is the cortex case)
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 ```
 
@@ -57,7 +57,7 @@ C++: `-fno-exceptions -fno-rtti`. IDF ≥ 5.5.
 
 ## Memory one-liners (ESPET)
 
-- One indexed-8 FB in DRAM (57.6 KB). Two 8-row RGB565 DMA bands (7.7 KB). Triangle scratch ~32 KB.
+- One indexed-8 FB in DRAM (57.6 KB). Two 8-row RGB565 DMA bands (7.7 KB). Triangle scratch for 1024 tris (~32 KB).
 - **Room palette** 256 (512 B), copy on door. Index 0 = key; 1–63 actor **ramps**; 64–255 room.
 - Raster inner loop never touches PSRAM. Play buffer is DRAM (7.2 KB). No backdrop.
 - Meshes and the weighted pet: flash XIP. Shadow/FX stamps: flash. Pose mailbox in DRAM (six bone 3×4s).
@@ -69,7 +69,8 @@ C++: `-fno-exceptions -fno-rtti`. IDF ≥ 5.5.
 | What | Rate |
 | :--- | :--- |
 | IMU + filter | 100 Hz |
-| Sim (Core 0) and present (Core 1) | 30 Hz (33.3 ms deadline) |
+| Sim (Core 0) | 30 Hz |
+| Present (Core 1) | glass ceiling 80 Hz (12500 µs); a slower frame runs at its work time |
 | Play buffer | 12 kHz, 300 ms, DMA |
 | Lizard (later) | 20 Hz |
 | Housekeeping | 1–10 Hz |

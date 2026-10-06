@@ -8,11 +8,11 @@ The ESP32-S3 has **two** [Xtensa](../glossary.md#xtensa) [cores](../glossary.md#
 
 ## `app_main` is already a task
 
-When IDF boots, it calls `app_main`. In [firmware/main.c](../../firmware/main.c) the `for (;;)` loop *is* the program: read IMU, fill pixels, `vTaskDelay(33 ms)`.
+When IDF boots, it calls `app_main`. In [firmware/main/main.c](../../firmware/main/main.c) the `for (;;)` loop *is* the program: an indexed frame, paced at the glass ceiling (`platform_pace(12500)`). It does not read the IMU.
 
-`vTaskDelay` **blocks**: this task sleeps, other tasks can run. That is fine for a hello world. Architecture Core 1 waits for an absolute 33.3 ms deadline. It must not block waiting for Core 0, Wi-Fi, or I2S. A stalled sim holds the last pose.
+`vTaskDelay` **blocks**: this task sleeps, other tasks can run. That is fine for a hello world. Architecture Core 1 waits only for the glass ceiling, **12500 µs**. It must not block waiting for Core 0, Wi-Fi, or I2S. A stalled sim holds the last pose.
 
-[Tick](../glossary.md#tick): `CONFIG_FREERTOS_HZ=1000` means 1 ms ticks. `pdMS_TO_TICKS(33)` is ~33 ticks.
+[Tick](../glossary.md#tick): `CONFIG_FREERTOS_HZ=1000` means 1 ms ticks. `pdMS_TO_TICKS(12)` is 12 ticks, near that ceiling.
 
 ## Two cores, two jobs
 
@@ -35,24 +35,24 @@ An [ISR](../glossary.md#isr) runs because a pin changed (IMU FIFO watermark, tou
 - Do **not** talk [I2C](../glossary.md#i2c) inside the ISR.
 - A task at prio 12 then drains the FIFO.
 
-That is “deferred work.” Polling the IMU every 33 ms (current `main.c`) is a training wheel. Lesson 08 moves toward FIFO; hardware lesson 13 finishes the INT.
+That is “deferred work.” Polling the IMU inside the present loop is a training wheel. The raster stub does not read the IMU. Lesson 08 moves toward FIFO; hardware lesson 13 finishes the INT.
 
-## The 33.3 ms budget
+## The glass ceiling
 
-30 [FPS](../glossary.md#fps) = 1000/30 ≈ 33.3 ms per frame. Architecture times (40 MHz SPI):
+There is no locked frame rate. 80 Hz is **12500 µs** between frame starts. A slower frame runs at its own work time. A quiet frame skips SPI. Core 0’s sim step stays at 30 Hz. Architecture times at 80 MHz SPI:
 
 | Slice | Time |
 | :--- | :--- |
 | Core spring + FK + rigids (Core 0) | 1–4 ms typical |
 | Skin + raster (Core 1) | ~1–3 ms dirty; ~4–10 ms full frame |
-| SPI DMA | dirty rows, or ~23 ms when `full_frame` |
-| Slack | wait for the deadline |
+| SPI DMA | dirty rows, or ~12.3 ms when `full_frame` |
+| Slack | only if the frame finished inside 12500 µs |
 
 Lock with [CCOUNT](../glossary.md#ccount) or a [GPTimer](../glossary.md#gptimer). The tick is an absolute deadline, not a delay after the work. If the pose matches the last one, the row mask is empty and you skip SPI ([GRAM](../glossary.md#gram) holds). That is the frame period, not an 8 h gate.
 
 ## Pose mailbox (how cores share)
 
-Core 0 writes a [pose](../../architecture.md#5-pose-mailbox-dram-only): timestamp, camera, six bone matrices, rigid instances. Three slots. Core 1 loads the latest and the previous, and interpolates to **this** deadline. It never peeks again that frame. If the sim misses a publish, Core 1 draws the last complete pose. It does not extrapolate.
+Core 0 writes a [pose](../../architecture.md#5-pose-mailbox-dram-only): timestamp, camera, six bone matrices, rigid instances. Three slots. Core 1 loads the latest and the previous, and interpolates to the time this frame starts. It never peeks again that frame. If the sim misses a publish, Core 1 draws the last complete pose. It does not extrapolate.
 
 ```c
 /* idea, not a copy-paste API */

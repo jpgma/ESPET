@@ -42,7 +42,7 @@ Dirty rows: the whole glass until you have a pose match. Goal: when the pose mat
 
 Skip SPI if the pose matches (nothing moved). **Do not** test `|Δq|`. The window is authored. See [architecture](../../architecture.md#4-core-allocation).
 
-Log skipped vs drawn. If you draw 30 Hz while the board sits still, you are sampling IMU into the camera.
+Log skipped vs drawn. If you redraw every frame while the board sits still, you are sampling IMU into the camera.
 
 ## Shake (preview)
 

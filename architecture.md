@@ -21,8 +21,8 @@ Look references (nearest-neighbor panel pixels, not asset bakes): [refs/look/](r
 | Touch | **CST816D** (`ChipID` `0xB6`, proj `0x27`, fw `0x01`), I2C **0x15**, INT 48 idle high, RST 47, **one finger**. The resources pack says CST816T; S/T/D share the map. `EnDClick` exists (`GestureID` `0x0B`); mapping is lizard TBD. |
 | Audio | **v1.** ES8311 **0x18** (ID `0x83`/`0x11`) + NS4150B GPIO7. One **12 kHz** play buffer on Core 0; I2S DMA plays it. Impacts are procedural. Creature chirps are **s8** in flash. ES7210 **0x40 never probe** (it ACKs; ID bytes stay `0xFF` until MCLK). MX1.25 speaker is **fitted, non-polarized, and audible** — a 440 Hz sine at 16 kHz was heard. |
 | Storage | TF slot present. **Unused in the frame loop.** Audio is not on the card. |
-| Display rate | **30 FPS** cap. One period for still frames and for full-frame clips. |
-| Battery | ~1000 mAh. **8 h is parked.** Dirty rows and an empty SPI mask stay so a still frame fits in 33 ms. Wi-Fi is a luxury mode. |
+| Display rate | No locked FPS. Glass ceiling **80 Hz** (**12500 µs**). A slower frame runs at its own work time. A quiet frame skips SPI. One ceiling for still frames and `full_frame` clips. |
+| Battery | ~1000 mAh. **8 h is parked.** Dirty rows and an empty SPI mask stay so a still pose ships nothing. A full frame is already ~12.3 ms of wire. Play does not need Wi-Fi; this firmware starts it so the heap is the cortex case. |
 | Look | Low-poly, hard edges, flat facets, Spore Creatures (NDS) silhouette. **Live raster of the whole room**, always. Three N·L bands at triangle setup. No photograph, no textures, no alpha, no z-buffer. Panel refs: [forest](refs/look/espet_flat_forest_clearing_240.png), [night](refs/look/espet_flat_night_sleep_240.png), [play](refs/look/espet_flat_physics_play_240.png), [close-up](refs/look/espet_flat_closeup_240.png). |
 | Camera | **Room-authored** 3/4 `look_at` (elev ~40°, azimuth = `room.front`). FOV ~55°. **Never** from IMU `q`. A scripted shake or close-up sets `full_frame` and may move the camera for that clip only. |
 | Pet draw | **One** smooth-skinned mesh, six bones, **two** influences per vertex. Close vs far is the camera and the room size, not a second mesh. **Shadow** is a floor stamp. |
@@ -40,13 +40,13 @@ Look references (nearest-neighbor panel pixels, not asset bakes): [refs/look/](r
 1. Core 1 never waits on Core 0, Wi-Fi, or the LLM. A stalled sim holds the last pose.
 2. The pet is complete with the radio off.
 3. World down is real gravity. The screen is a camera, not a world axis.
-4. A still pose does not ship pixels. Spinning at 240 MHz with a static frame is a bug. **Silence with I2S clocks or the PA up is the same bug.** The 8 h target is later; the empty mask is how the 33 ms tick survives.
+4. A still pose does not ship pixels. Spinning at 240 MHz with a static frame is a bug. **Silence with I2S clocks or the PA up is the same bug.** The 8 h target is later; the empty mask is how a still pose ships nothing. The present ceiling is the glass, **12500 µs**.
 5. Meshes are appearance. The core spring is state. Bone clips are appearance. Pixels are not physics.
 6. Clips write **bone locals**. The core spring only lags the body. Appendages do not spring.
 7. The camera is **room-authored** and static per room until a clip sets `full_frame`. IMU tilt does not orbit.
 8. Core 1 never plays audio. The sim on Core 0 renders one-shots into the play buffer. I2S DMA plays it.
 
-The raster core this product calls (filler, clip, pose mailbox) is the learning track in **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154/docs/raster`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154/docs/raster). Do not copy that track's "Wi-Fi up in the steady state" policy. Radio stays off unless cortex.
+The raster core this product calls (filler, clip, pose mailbox) is the task list in [`docs/raster`](docs/raster/README.md). This firmware starts Wi-Fi so the internal heap is the cortex case. The pet is still complete with the radio off.
 
 ---
 
@@ -108,7 +108,7 @@ Nest S  ←→  Hall L  ←→  Yard L
 | Props (tap magnets; may also be rigid) | 8 |
 | Awake rigid bodies | **24** |
 | Doors | 4 (one per wall, may be none) |
-| Visible triangles | **~1024** (room + pet + movers) |
+| Visible triangles | **1024** (room + pet + movers) |
 | Event FX stamps | 256 |
 
 Sky is a few horizontal quads. A floor is a handful of large triangles, not a grass texture. Static contact darkening is authored darker faces under props. The moving pet's shadow is a floor stamp.
@@ -183,9 +183,9 @@ Thin lock (do not invent pins). Drive **`BAT_EN` high in `app_main` before any b
 
 I2C 7-bit: QMI8658 **0x6B**, CST816 **0x15**, ES8311 **0x18**, ES7210 **0x40 never probe**. No dedicated RTC IC — persistence is S3 RTC SRAM. TF SDMMC 4-bit (16/15/17/18/13/14) is unused; **GPIO18 is TF D1, not a spare.** Charge current is ISET **160 kΩ**, not software.
 
-**sdkconfig:** `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_SPIRAM_MODE_OCT=y`, `CONFIG_SPIRAM_SPEED_80M=y`, quad flash 80 MHz (not OPI), `CONFIG_FREERTOS_HZ=1000`, Bluetooth **off**, Wi-Fi started only in cortex mode, USB CDC on boot. This unit’s flash JEDEC ID is **0x204018** (XMC). The schematic text says W25Q128JVSIQ. IDF reports the chip as `generic`. QIO 80 MHz already boots.
+**sdkconfig:** `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_SPIRAM_MODE_OCT=y`, `CONFIG_SPIRAM_SPEED_80M=y`, quad flash 80 MHz (not OPI), `CONFIG_FREERTOS_HZ=1000`, Bluetooth **off**, Wi-Fi **started** (the heap test is the cortex case; play is complete with it off), USB CDC on boot. This unit’s flash JEDEC ID is **0x204018** (XMC). The schematic text says W25Q128JVSIQ. IDF reports the chip as `generic`. QIO 80 MHz already boots.
 
-**SPI:** **mode 3, 80 MHz**, picture clear. Full 240×240 RGB565 measured **12271 µs** (wire ≈ 11.5 ms; 40 MHz would be ≈ 23 ms). 30 FPS still wants **dirty rows**; a full frame leaves about 21 ms inside the 33 ms budget. A `full_frame` clip or a door pays the full frame. Controller GRAM is **240×320**; window the visible **240×240** and lock offsets before trusting dirty-rect.
+**SPI:** **mode 3, 80 MHz**, picture clear. Full 240×240 RGB565 measured **12271 µs** (wire ≈ 11.5 ms; 40 MHz would be ≈ 23 ms). Dirty rows stay, because a full frame is already ~12.3 ms of wire and a still pose must not ship pixels. A `full_frame` clip or a door pays the full frame. Controller GRAM is **240×320**; window the visible **240×240** and lock offsets before trusting dirty-rect.
 
 ---
 
@@ -195,7 +195,7 @@ Wi-Fi DMA cannot live in PSRAM. One indexed frame plus the radio is the plan. A 
 
 | Region | Use |
 | :--- | :--- |
-| **Internal DRAM** | One **8-bit indexed** framebuffer (57.6 KB). Palette 256×RGB565 (512 B). Two DMA bands, 8 rows: `2 × 8 × 240 × 2 = 7680` B. Screen-space triangle scratch for ~1024 tris (~32 KB). Pose mailbox, three slots (camera + six bone matrices + rigid instances). Core spring, `Rigid[24]`, `FxPool` 256, seqlock, **play buffer** (12 kHz × 300 ms `int16` = 7200 B), RTOS stacks. Raster inner loop **never** touches PSRAM. The play buffer stays in DRAM. Playback does not read PSRAM or flash. No z-buffer. No RGB framebuffer. |
+| **Internal DRAM** | One **8-bit indexed** framebuffer (57.6 KB). Palette 256×RGB565 (512 B). Two DMA bands, 8 rows: `2 × 8 × 240 × 2 = 7680` B. Screen-space triangle scratch for 1024 tris (~32 KB). Pose mailbox, three slots (camera + six bone matrices + rigid instances). Core spring, `Rigid[24]`, `FxPool` 256, seqlock, **play buffer** (12 kHz × 300 ms `int16` = 7200 B), RTOS stacks. Raster inner loop **never** touches PSRAM. The play buffer stays in DRAM. Playback does not read PSRAM or flash. No z-buffer. No RGB framebuffer. |
 | **Octal PSRAM** | Optional cold copies (next-room mesh prefetch, stamp pixels if XIP thrashes). Not the framebuffer. Not the play buffer. Not the pose. Not a backdrop. |
 | **16 MB flash** | Firmware, bone clips, weighted pet mesh, room meshes, `MatRamp[]`, room records, **per-room palettes** + `light_dir`, FX/shadow stamps, `ImpactPatch[]`, creature chirps (**s8**). XIP for cold tables and meshes. Chirp bytes are read once when the sim renders. |
 | **RTC SRAM** | Hunger, happy, sleep, last emotion, **`room_id`**. |
@@ -209,7 +209,7 @@ Wi-Fi DMA cannot live in PSRAM. One indexed frame plus the radio is the plan. A 
 | Indexed frame | DRAM | 57.6 KB |
 | Palette | DRAM | 512 B |
 | DMA bands | DRAM | 7.7 KB |
-| Triangle scratch (~1024) | DRAM | ~32 KB |
+| Triangle scratch (1024) | DRAM | ~32 KB |
 | Pose × 3 | DRAM | ~2–4 KB |
 | Core spring + `Rigid[24]` | DRAM | ~2 KB |
 | `FxPool` 256 | DRAM | ~8 KB |
@@ -547,9 +547,9 @@ Raster one triangle at a time. For a skinned triangle, blend two bone 3×4s onto
 | Room shell + props | a few hundred |
 | Pet | a few hundred vertices, well under ~200 tris |
 | Awake rigids | the rest, up to the cap |
-| **Cap** | **~1024** |
+| **Cap** | **1024** |
 
-Fill, not the count, is the wall. A still S window (~120×140, ~2× overdraw) is about 1–2.5 ms. A `full_frame` clip at ~2× over the whole glass is about 4–10 ms and overlaps the 23 ms wire at 40 MHz. ~4× overdraw on a moving camera is the frame that misses 30 Hz. Measure it. If it misses, lower the **single** period. Do not add a second cadence.
+Fill, not the count, is the wall. A still S window (~120×140, ~2× overdraw) is about 1–2.5 ms. A `full_frame` clip at ~2× over the whole glass is about 4–10 ms and overlaps the 23 ms wire at 40 MHz. ~4× overdraw on a moving camera is the frame that misses the glass ceiling. Measure it. If the work is slower, that frame runs at its work time. Do not add a second cadence.
 
 ### FX
 
@@ -573,14 +573,14 @@ Spawn: shake → dust (leaves if the room has an emitter); floor impulse → dus
 
 **Dirty rows:** union of projected moving AABBs, one bit per row. `full_frame` sets all 240. ST7789 `CASET`/`RASET` per band. Door and `full_frame` clips: full 240×240 ≈ 23 ms at 40 MHz, ≈ 11.5 ms at 80 MHz. Tearing is accepted (no TE pin).
 
-**Budget (30 Hz, 40 MHz SPI)**
+**Budget (glass ceiling, 80 MHz SPI)**
 
 | Slice | Still camera | `full_frame` clip |
 | :--- | ---: | ---: |
 | Core spring + FK + rigids + FX (Core 0) | 1–4 ms typical; a stacked heap can be more | same; a miss holds the pose |
 | Skin + raster (Core 1) | dirty window, ~1–3 ms | ~4–10 ms at ~2× |
-| SPI DMA | dirty rows | **~23 ms**, overlapped with the filler |
-| Slack | wait for the deadline | the wire is the long pole |
+| SPI DMA | dirty rows | **~12.3 ms** at 80 MHz, overlapped with the filler |
+| Slack | only if the frame finished inside 12500 µs | the wire is the long pole |
 
 `board-sim` never rasterizes a habitat. The rasterizer lives in `firmware/` and shows up as ST7789 GRAM pixels.
 
@@ -600,7 +600,7 @@ Blender: low poly, hard edges, flat faces, 6-bone armature. Vertex material id. 
 4. Clip frames: bone-local rotation (and optional translation) `int16`, once per frame. Do not export a mesh per frame.
 5. `full_frame` on the clip header if that clip moves the camera.
 
-**Exporter must fail** if a vertex has more than two influences, if a material ramp uses indices outside 1–63, or if a room's visible set exceeds ~1024 triangles.
+**Exporter must fail** if a vertex has more than two influences, if a material ramp uses indices outside 1–63, or if a room's visible set exceeds 1024 triangles.
 
 Rooms in the pak: id, size (S/L), front, view/proj, `light_dir`, `palette[256]`, scenery AABBs, props, doors, mesh ids, toy slots, optional leaf emitter.
 
@@ -690,14 +690,14 @@ A still pose skips SPI because the pose matches, not because of the battery. Mea
 | Lever | Now | Later, if 8 h returns |
 | :--- | :--- | :--- |
 | ST7789 | Dirty rows; empty mask when the pose matches | same |
-| CPU | 240 MHz while a frame has work; wait out the rest of the 33 ms | 80/160 after a few seconds still |
+| CPU | 240 MHz while a frame has work; wait only for the rest of the glass period (12500 µs) | 80/160 after a few seconds still |
 | Slack | Core 1 waits for the deadline | light-sleep only if DMA is idle and the PA is down |
-| Wi-Fi | Off unless cortex | same |
+| Wi-Fi | This firmware starts it so the heap is the cortex case. Play is complete with it off | same |
 | Audio | PA + I2S clocks only while DMA is running. ES7210 off. SD off | same |
 | Backlight | On for bring-up. USB may be brighter | **30–40%** on battery (60 mA LED) |
 | Deep sleep | Face-down and PWR still need TX-done, PA low, `rtc_gpio_hold` on `BAT_EN` | same |
 
-USB in = **studio mode** (bright, 30 FPS, cortex allowed, USB debug). Unplug does not change the raster. Always hold `BAT_EN`. PWR long-press = latch off. Deep sleep ⇒ **no** USB Serial/JTAG.
+USB in = **studio mode** (bright, glass ceiling, cortex allowed, USB debug). Unplug does not change the raster. Always hold `BAT_EN`. PWR long-press = latch off. Deep sleep ⇒ **no** USB Serial/JTAG.
 
 **v1 wake map** (confirm edges on silicon):
 
@@ -738,7 +738,7 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 - [ ] No backdrop photograph; sky is quads; floor is a few large triangles
 - [ ] Six-bone smooth skin, two influences; skin at triangle setup; core is the only spring
 - [ ] Pose mailbox, three slots; Core 1 interpolates to the deadline; a stall holds the last pose
-- [ ] Visible triangles ≤ ~1024; scratch stays internal
+- [ ] Visible triangles ≤ 1024; scratch stays internal
 - [ ] Shadow is a floor stamp; N·L at setup; no textures, no z-buffer
 - [ ] Awake rigids ≤ 24; bowl does not flip; Nest content stays quiet
 - [ ] `FxPool` 256 stamps; dust/crumbs/leaves; floor only; one SFX per burst
@@ -762,18 +762,18 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 3. **Debug overlay:** room id, clip, frame, awake rigids, `full_frame`, `CCOUNT` of raster, VBAT ×3, backlight PWM. Studio only.
 4. **Blink** stays on the skinned mesh. Do not add a face stamp.
 5. **Palette 256**, with actor ramps reserved in 1–63, so a night cap keeps its red.
-6. **Exporter fails** on a third influence, a ramp outside 1–63, or a room over ~1024 tris.
+6. **Exporter fails** on a third influence, a ramp outside 1–63, or a room over 1024 tris.
 7. **USB = studio**, unplug = same raster. No settings menu in v1.
 8. **Compile-time SSID** for your LAN.
 9. A later kit swaps the weighted mesh and keeps the six bones, so a wave clip still addresses the arm.
-10. **Gate PA and I2S.** Silence with MCLK running is the audio version of a static 30 Hz SPI. PA ≥35 ms wake / ≥120 ms cold; do not re-trigger during ~80 ms shutdown.
+10. **Gate PA and I2S.** Silence with MCLK running is the audio version of a still frame that still ships SPI. PA ≥35 ms wake / ≥120 ms cold; do not re-trigger during ~80 ms shutdown.
 11. Thuds stay procedural so velocity can scale the decay. Creature lines are already s8 chirps in the same buffer. Do not add MP3 or the TF slot.
 12. Optional later: ≤3° IMU parallax. **v1 = 0.** That parallax would be `full_frame` every tick. Do not turn it on casually.
 13. **N·L at setup, not in the pixel loop.** Flat bands are the look and the budget. Index-Gouraud stays parked.
 14. **Leaves as 2-tri cards** can wait. Stamps are v1.
-15. **SPI mode 3 at 80 MHz is clear** on this glass. A full frame is ~12.3 ms, so the 33 ms budget keeps ~21 ms. Design dirty-rect around that.
+15. **SPI mode 3 at 80 MHz is clear** on this glass. A full frame is ~12.3 ms. Dirty rows keep a partial update under the glass, and a still pose ships nothing.
 16. **Bowl does not flip.**
-17. If a `full_frame` heap of rigids misses 30 Hz, lower the single period. Do not add a second clock.
+17. If a `full_frame` heap of rigids misses the glass ceiling, that frame runs at its work time. Do not add a second clock.
 18. Sim: **click-without-drag = CST816 tap**; drag past a few px = IMU. Do not overload left-drag.
 19. **`DisAutoSleep`** on CST816 from day one; first-tap-eaten is the usual foot-gun.
 20. GPIO3 is `CHG_STAT` and an S3 strap — bring-up note if USB-in-at-reset fights Serial/JTAG.
@@ -791,10 +791,10 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 3. **Lizard brain** — whole policy TBD. Hunger decay, wander, gaze, sleep, think, wave, poke mappings, cortex `action` → clip / room. Eat *when* (bowl magnet is locked).
 4. **Impact decay and chirp takes.** Machinery is locked; the sounds are data. The MX1.25 coil already answered a 440 Hz sine.
 5. **Face-down last frame** — Nest sleep pose vs freeze the current room? TBD with the brain.
-6. **How hard a `full_frame` shake may be** — triangle cap and overdraw are locked; the period drops only if silicon misses 33.3 ms.
+6. **How hard a `full_frame` shake may be** — triangle cap and overdraw are locked. The ceiling is the glass (12500 µs). A slower frame runs at its work time. There is no second clock.
 
-**Already locked, restated:** the room is triangles every frame. The pet is one skinned mesh. World down is gravity. No Kitchen. No follow-cam in L. No 4-yaw atlas. No backdrop. No z-buffer. Bowl does not flip. Wi-Fi stays off unless cortex. One I2C owner. ES7210 never probed. GPIO18 is not a spare.
+**Already locked, restated:** the room is triangles every frame. The pet is one skinned mesh. World down is gravity. No Kitchen. No follow-cam in L. No 4-yaw atlas. No backdrop. No z-buffer. Bowl does not flip. This firmware starts Wi-Fi so the heap is the cortex case. The pet is complete with the radio off. One I2C owner. ES7210 never probed. GPIO18 is not a spare.
 
 ---
 
-The body is a 30 Hz gravity-locked habitat on this Waveshare. Rooms are live flat dioramas: a slab, a few props, a sky of hard bands. The creature is one smooth skin on six bones, with a spring only in the core, and a floor stamp under its feet. Toys can knock around, then sleep. A clip may shake the camera or push it close; every other frame keeps the room's window. Impacts thud and clips can chirp. The lizard brain does not need a PC. The cortex is a guest.
+The body is a gravity-locked habitat on this Waveshare. Rooms are live flat dioramas: a slab, a few props, a sky of hard bands. The creature is one smooth skin on six bones, with a spring only in the core, and a floor stamp under its feet. Toys can knock around, then sleep. A clip may shake the camera or push it close; every other frame keeps the room's window. Impacts thud and clips can chirp. The lizard brain does not need a PC. The cortex is a guest.
