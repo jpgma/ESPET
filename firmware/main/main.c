@@ -24,12 +24,12 @@
 #include "palette.h"
 #include "platform.h"
 
-static const char *TAG = "raster";
+static const char *TAG = "ESPET";
 
-#define FRAME_BUFFER_SIZE_BYTES (LCD_H_RES * LCD_V_RES)
+#define FRAME_BUFFER_SIZE_BYTES (SCREEN_WIDTH * SCREEN_HEIGHT)
 #define PALETTE_SIZE 256
 #define BAND_ROWS 8
-#define ROW_MASK_SIZE_BYTES (LCD_V_RES / 8)
+#define ROW_MASK_SIZE_BYTES (SCREEN_HEIGHT / 8)
 
 #define GLASS_PERIOD_US 12500LL
 
@@ -43,7 +43,7 @@ _Static_assert(sizeof((uint16_t[]){ESPET_ACTOR_PALETTE_RGB565}) / sizeof(uint16_
                "actor palette is indices 0-63");
 _Static_assert(sizeof((uint16_t[]){ESPET_ROOM_NEST_RGB565}) / sizeof(uint16_t) <= PALETTE_SIZE - 64,
                "nest palette fits indices 64-255");
-DMA_ATTR static uint16_t s_bands[2][BAND_ROWS * LCD_H_RES];
+DMA_ATTR static uint16_t s_bands[2][BAND_ROWS * SCREEN_WIDTH];
 DMA_ATTR static uint8_t s_row_mask[ROW_MASK_SIZE_BYTES];
 
 static volatile int s_bg;
@@ -54,6 +54,12 @@ static void on_key(board_key_t key)
         s_bg = (s_bg + 1) % PALETTE_SIZE;
     } else {
         s_bg = (s_bg + PALETTE_SIZE - 1) % PALETTE_SIZE;
+    }
+    for(int i = 0; i < FRAME_BUFFER_SIZE_BYTES; i++){
+        s_indexed_framebuffer[i] = s_bg;
+    }
+    for(int i = 0; i < ROW_MASK_SIZE_BYTES; i += (s_bg%2) + 1){
+        s_row_mask[i] = 0xFF;
     }
     ESP_LOGI(TAG, "background %d", s_bg);
 }
@@ -66,10 +72,12 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(gpio_config(&bat));
     gpio_set_level(PIN_BAT_EN, 1);
+
+    ESP_LOGI(TAG, "ESPET starting up");
+    
     board_backlight_on_press(on_key);
     board_backlight_init();
 
-    ESP_LOGI(TAG, "raster stub (docs/raster)");
     platform_prepare(s_indexed_framebuffer, sizeof(s_indexed_framebuffer),
                      s_pallete, sizeof(s_pallete),
                      s_bands, sizeof(s_bands));
@@ -84,7 +92,7 @@ void app_main(void)
         .data5_io_num = -1,
         .data6_io_num = -1,
         .data7_io_num = -1,
-        .max_transfer_sz = LCD_H_RES * LCD_V_RES * (int)sizeof(uint16_t),
+        .max_transfer_sz = SCREEN_WIDTH * SCREEN_HEIGHT * (int)sizeof(uint16_t),
     };
     ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
 
@@ -118,19 +126,32 @@ void app_main(void)
         platform_pace(GLASS_PERIOD_US);
 
         int slot = 0;
-        for (int y1 = 0; y1 < LCD_V_RES; y1 += BAND_ROWS) {
+        for (int y1 = 0; y1 < SCREEN_HEIGHT; y1 += BAND_ROWS) {
+
+            // skip band if none updated
+            int band_mask_index = y1/BAND_ROWS;
+            uint8_t band_mask = s_row_mask[band_mask_index];
+            if(band_mask == 0) continue;
+
             uint16_t *bounce = s_bands[slot];
             for (int row = 0; row < BAND_ROWS; row++) {
-                for (int x = 0; x < LCD_H_RES; x++) {
-                    bounce[row * LCD_H_RES + x] = s_pallete[s_bg];
+                for (int x = 0; x < SCREEN_WIDTH; x++) {
+                    
+                    int fb_index = (y1+row) * SCREEN_WIDTH + x;
+                    uint8_t color_index = s_indexed_framebuffer[fb_index];
+                    uint16_t color = s_pallete[color_index];
+                    bounce[row * SCREEN_WIDTH + x] = color;
                 }
             }
+            
             /* Expand above overlapped the previous band. Draw only after it finishes. */
             platform_wait_dma();
             ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(
-                panel, 0, y1, LCD_H_RES, y1 + BAND_ROWS, bounce));
+                panel, 0, y1, SCREEN_WIDTH, y1 + BAND_ROWS, bounce));
             platform_dma_queued();
             slot ^= 1;
+
+            s_row_mask[band_mask_index] = 0x0;
         }
         platform_wait_dma();
     }

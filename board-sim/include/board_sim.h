@@ -44,6 +44,9 @@ void board_sim_imu_tick(float dt_s);
 int board_sim_imu_i2c_tx(const uint8_t *data, size_t len);
 int board_sim_imu_i2c_txrx(const uint8_t *w, size_t wlen, uint8_t *r, size_t rlen);
 
+/* Active-low glass keys, scan order: 0 PWR, 1 PLUS, 2 BOOT. down holds the line low. */
+void board_sim_button(int which, int down);
+
 void board_sim_touch_init(void);
 void board_sim_touch_on_tap(int x, int y, int double_click);
 int board_sim_touch_i2c_tx(const uint8_t *data, size_t len);

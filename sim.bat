@@ -53,6 +53,7 @@ echo   set BOARD_SIM_SPI_HZ=40000000
 echo CPU stretch is coarse. A sim overrun is not the silicon pass bar.
 echo   set BOARD_SIM_CPU_HZ=0   turns the stretch off
 echo.
+echo Keys 1, 2, and 3 are the Waveshare PWR, PLUS, and BOOT buttons.
 echo Firmware lives in firmware\  (no SDL^). The window is board-sim\ only.
 exit /b 0
 
@@ -150,6 +151,6 @@ if "!DO_RUN!"=="0" (
 )
 
 echo Running !EXE!
-echo Click taps the fake CST816. Drag past a few pixels tilts the fake IMU.
+echo Keys 1 2 3 are PWR, PLUS, and BOOT. Click taps the fake CST816. Drag past a few pixels tilts the fake IMU.
 "!EXE!"
 exit /b %ERRORLEVEL%
