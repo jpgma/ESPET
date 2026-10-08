@@ -1,5 +1,7 @@
 #include "platform.h"
 
+#include "board_sim.h"
+
 #include <stdio.h>
 
 #define WIN32_LEAN_AND_MEAN
@@ -50,12 +52,22 @@ void platform_dma_queued(void)
 {
 }
 
-void platform_pace(int64_t period_us)
+void platform_cpu_yield(void)
+{
+    board_sim_cpu_yield();
+}
+
+int64_t platform_now_us(void)
+{
+    return host_time_us();
+}
+
+int64_t platform_pace(int64_t period_us)
 {
     int64_t now = host_time_us();
     if (s_qpc_freq.QuadPart == 0) {
         s_has_started = 1;
-        return;
+        return 0;
     }
     int64_t next = s_last_frame_start_us + period_us;
     if (s_has_started && now < next) {
@@ -67,6 +79,9 @@ void platform_pace(int64_t period_us)
             now = host_time_us();
         } while (now < next);
     }
+    int64_t gap = s_has_started ? now - s_last_frame_start_us : 0;
     s_last_frame_start_us = now;
     s_has_started = 1;
+    board_sim_cpu_yield();
+    return gap;
 }

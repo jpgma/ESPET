@@ -26,5 +26,11 @@ void platform_wait_dma(void);
 void platform_dma_queued(void);
 
 /* Hold this frame's start until period_us after the previous start.
- * A late frame starts immediately. Missed ticks are not owed. */
-void platform_pace(int64_t period_us);
+ * A late frame starts immediately. Missed ticks are not owed.
+ * Returns microseconds since the previous start, or 0 on the first call. */
+int64_t platform_pace(int64_t period_us);
+
+/* Drop idle (glass wait, console) from the sim's CPU stretch. No-op on the chip. */
+void platform_cpu_yield(void);
+
+int64_t platform_now_us(void);

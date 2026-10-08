@@ -55,10 +55,10 @@ Raster tasks: [docs/raster](docs/raster/README.md).
 Not part of `sim.bat`. From the repo root, with the board on USB:
 
 ```text
-flash.bat
+flash.bat --watch
 ```
 
-That builds `firmware/` with ESP-IDF and flashes the Espressif USB port. `--port COMx` overrides the port. ESP-IDF is `%USERPROFILE%\esp\esp-idf`, or `IDF_PATH` if that is already set. Do not put `board-sim/fake_idf` on that include path. Pins and `BAT_EN` are in the [hardware contract](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md).
+That builds `firmware/` with ESP-IDF, flashes the Espressif USB port, and opens an **ESPET** window with the serial log. `ESP_LOGI` lines show up there. Close that window to stop, or Ctrl+C in it. `flash.bat` without `--watch` flashes and returns. `--port COMx` overrides the port. ESP-IDF is `%USERPROFILE%\esp\esp-idf`, or `IDF_PATH` if that is already set. Do not put `board-sim/fake_idf` on that include path. Pins and `BAT_EN` are in the [hardware contract](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md).
 
 ## Mental model
 

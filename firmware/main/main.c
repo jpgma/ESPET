@@ -68,6 +68,54 @@ static void on_key(board_key_t key)
     ESP_LOGI(TAG, "background %d", s_bg);
 }
 
+/* Ten frame starts, then one log. The sample after a log is dropped so
+ * console time is not part of the next gap. */
+#define GAP_N 10
+
+static int s_gap_n;
+static int s_gap_skip;
+static int64_t s_gaps[GAP_N];
+static int64_t s_ships[GAP_N];
+
+static void log_gaps(void)
+{
+    int64_t min = s_gaps[0];
+    int64_t max = s_gaps[0];
+    int64_t sum = 0;
+    for (int i = 0; i < GAP_N; i++) {
+        int64_t g = s_gaps[i];
+        if (g < min) {
+            min = g;
+        }
+        if (g > max) {
+            max = g;
+        }
+        sum += g;
+        ESP_LOGI(TAG, "gap %d/%d: %lld us  ship %lld us  wait %lld us",
+                 i + 1, GAP_N, (long long)g, (long long)s_ships[i],
+                 (long long)(g - s_ships[i]));
+    }
+    ESP_LOGI(TAG, "gap min %lld max %lld mean %lld us (glass 12500)",
+             (long long)min, (long long)max, (long long)(sum / GAP_N));
+    platform_cpu_yield();
+}
+
+static void note_frame(int64_t gap_us, int64_t ship_us)
+{
+    if (s_gap_skip) {
+        s_gap_skip = 0;
+        return;
+    }
+    s_gaps[s_gap_n] = gap_us;
+    s_ships[s_gap_n] = ship_us;
+    s_gap_n++;
+    if (s_gap_n == GAP_N) {
+        log_gaps();
+        s_gap_n = 0;
+        s_gap_skip = 1;
+    }
+}
+
 void app_main(void)
 {
     gpio_config_t bat = {
@@ -127,7 +175,8 @@ void app_main(void)
     platform_spi_arm(io);
 
     for (;;) {
-        platform_pace(GLASS_PERIOD_US);
+        int64_t gap_us = platform_pace(GLASS_PERIOD_US);
+        int64_t ship_t0 = platform_now_us();
 
         /* Read once. Bits set during this ship belong to the next frame. */
         uint8_t frame_mask[ROW_MASK_SIZE_BYTES];
@@ -137,6 +186,7 @@ void app_main(void)
             any |= frame_mask[i];
         }
         if (!any) {
+            note_frame(gap_us, 0);
             continue;
         }
 
@@ -172,5 +222,6 @@ void app_main(void)
             s_row_mask[i] &= (uint8_t)~frame_mask[i];
         }
         platform_wait_dma();
+        note_frame(gap_us, platform_now_us() - ship_t0);
     }
 }

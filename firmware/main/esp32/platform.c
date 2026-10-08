@@ -91,7 +91,16 @@ void platform_dma_queued(void)
     s_band_in_flight = 1;
 }
 
-void platform_pace(int64_t period_us)
+void platform_cpu_yield(void)
+{
+}
+
+int64_t platform_now_us(void)
+{
+    return esp_timer_get_time();
+}
+
+int64_t platform_pace(int64_t period_us)
 {
     int64_t next = s_last_frame_start_us + period_us;
     int64_t now = esp_timer_get_time();
@@ -99,6 +108,8 @@ void platform_pace(int64_t period_us)
         esp_rom_delay_us((uint32_t)(next - now));
         now = esp_timer_get_time();
     }
+    int64_t gap = s_has_started ? now - s_last_frame_start_us : 0;
     s_last_frame_start_us = now;
     s_has_started = 1;
+    return gap;
 }

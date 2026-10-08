@@ -3,6 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 
 set "PORT="
+set "WATCH=0"
 set "MS_PORT=0"
 set "MS_EXPORT=0"
 set "MS_BUILD=0"
@@ -14,6 +15,11 @@ if "%~1"=="" goto parsed
 if /I "%~1"=="--help" goto help
 if /I "%~1"=="-h" goto help
 if /I "%~1"=="/?" goto help
+if /I "%~1"=="--watch" (
+    set "WATCH=1"
+    shift
+    goto parse
+)
 if /I "%~1"=="--port" (
     shift
     if "%~1"=="" (
@@ -32,8 +38,12 @@ goto help_err
 echo Flash the ESPET firmware on the Waveshare ESP32-S3-Touch-LCD-1.54.
 echo.
 echo   flash.bat              build and flash firmware\
+echo   flash.bat --watch      same, then open the serial console
 echo   flash.bat --port COM4  use this port instead of the Espressif USB device
 echo   flash.bat --help
+echo.
+echo --watch opens an ESPET window with the log. Close that window to stop.
+echo Ctrl+C in that window also stops. Do not use Ctrl+] in this terminal.
 echo.
 echo ESP-IDF is %%USERPROFILE%%\esp\esp-idf, or IDF_PATH if that is already set.
 echo The simulator is sim.bat. This script does not use board-sim.
@@ -74,7 +84,11 @@ if not defined PORT (
 )
 
 echo Using ESP-IDF: %IDF_PATH%
-echo Flashing firmware on !PORT!
+if "!WATCH!"=="1" (
+    echo Flashing firmware on !PORT!, then opening the serial console
+) else (
+    echo Flashing firmware on !PORT!
+)
 
 call :now_ms T0
 call "%IDF_PATH%\export.bat"
@@ -101,6 +115,17 @@ call :elapsed_ms T0 MS_FLASH
 :timed_done
 call :elapsed_ms T_ALL MS_TOTAL
 call :print_timings
+if not "!WATCH!"=="1" goto flash_exit
+if not "!FLASH_RC!"=="0" goto flash_exit
+
+echo.
+echo Serial log is in the ESPET window. Close that window to stop.
+set "PY=!IDF_PYTHON_ENV_PATH!\Scripts\python.exe"
+if not exist "!PY!" set "PY=python"
+start "ESPET" /wait "!PY!" "%IDF_PATH%\tools\idf.py" -C firmware -p !PORT! monitor
+set "FLASH_RC=0"
+
+:flash_exit
 exit /b !FLASH_RC!
 
 :now_ms
