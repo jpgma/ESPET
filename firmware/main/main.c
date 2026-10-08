@@ -3,10 +3,8 @@
  *
  * sim.bat
  * On the board, from the firmware folder: idf.py build flash monitor
- * This stub paints a steady marker. It presents as fast as the 80 MHz
- * wire allows. The glass cap is 80 Hz (docs/raster). A full frame is
- * already about that cap, so this loop does not sleep. Task 3 replaces
- * the loop.
+ * Presents dirty rows under the 80 Hz glass cap.
+ * docs/raster/03-cadenced-present.md
  */
 
 #include <stdint.h>
@@ -47,6 +45,12 @@ DMA_ATTR static uint16_t s_bands[2][BAND_ROWS * SCREEN_WIDTH];
 DMA_ATTR static uint8_t s_row_mask[ROW_MASK_SIZE_BYTES];
 
 static volatile int s_bg;
+
+/* Bit 0 is the first row in that byte. */
+static int row_is_dirty(const uint8_t *mask, int y)
+{
+    return (mask[y / 8] >> (y & 7)) & 1;
+}
 
 static void on_key(board_key_t key)
 {
@@ -125,33 +129,47 @@ void app_main(void)
     for (;;) {
         platform_pace(GLASS_PERIOD_US);
 
+        /* Read once. Bits set during this ship belong to the next frame. */
+        uint8_t frame_mask[ROW_MASK_SIZE_BYTES];
+        int any = 0;
+        for (int i = 0; i < ROW_MASK_SIZE_BYTES; i++) {
+            frame_mask[i] = s_row_mask[i];
+            any |= frame_mask[i];
+        }
+        if (!any) {
+            continue;
+        }
+
         int slot = 0;
-        for (int y1 = 0; y1 < SCREEN_HEIGHT; y1 += BAND_ROWS) {
-
-            // skip band if none updated
-            int band_mask_index = y1/BAND_ROWS;
-            uint8_t band_mask = s_row_mask[band_mask_index];
-            if(band_mask == 0) continue;
-
-            uint16_t *bounce = s_bands[slot];
-            for (int row = 0; row < BAND_ROWS; row++) {
-                for (int x = 0; x < SCREEN_WIDTH; x++) {
-                    
-                    int fb_index = (y1+row) * SCREEN_WIDTH + x;
-                    uint8_t color_index = s_indexed_framebuffer[fb_index];
-                    uint16_t color = s_pallete[color_index];
-                    bounce[row * SCREEN_WIDTH + x] = color;
-                }
+        int y = 0;
+        while (y < SCREEN_HEIGHT) {
+            if (!row_is_dirty(frame_mask, y)) {
+                y++;
+                continue;
             }
-            
+
+            int y0 = y;
+            int rows = 0;
+            uint16_t *bounce = s_bands[slot];
+            while (y < SCREEN_HEIGHT && rows < BAND_ROWS && row_is_dirty(frame_mask, y)) {
+                for (int x = 0; x < SCREEN_WIDTH; x++) {
+                    int fb_index = y * SCREEN_WIDTH + x;
+                    bounce[rows * SCREEN_WIDTH + x] = s_pallete[s_indexed_framebuffer[fb_index]];
+                }
+                y++;
+                rows++;
+            }
+
             /* Expand above overlapped the previous band. Draw only after it finishes. */
             platform_wait_dma();
             ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(
-                panel, 0, y1, SCREEN_WIDTH, y1 + BAND_ROWS, bounce));
+                panel, 0, y0, SCREEN_WIDTH, y0 + rows, bounce));
             platform_dma_queued();
             slot ^= 1;
+        }
 
-            s_row_mask[band_mask_index] = 0x0;
+        for (int i = 0; i < ROW_MASK_SIZE_BYTES; i++) {
+            s_row_mask[i] &= (uint8_t)~frame_mask[i];
         }
         platform_wait_dma();
     }
