@@ -16,6 +16,8 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "board_backlight.h"
 #include "board_pins.h"
@@ -45,6 +47,7 @@ DMA_ATTR static uint16_t s_bands[2][BAND_ROWS * SCREEN_WIDTH];
 DMA_ATTR static uint8_t s_row_mask[ROW_MASK_SIZE_BYTES];
 
 static volatile int s_bg;
+static esp_lcd_panel_handle_t s_panel;
 
 /* Bit 0 is the first row in that byte. */
 static int row_is_dirty(const uint8_t *mask, int y)
@@ -116,6 +119,64 @@ static void note_frame(int64_t gap_us, int64_t ship_us)
     }
 }
 
+static void present_task(void *arg)
+{
+    (void)arg;
+
+    for (;;) {
+        int64_t gap_us = platform_pace(GLASS_PERIOD_US);
+        int64_t ship_t0 = platform_now_us();
+
+        // render goes here ig
+
+        // ler mask de rows, se nada mudou, nada renderiza
+        uint8_t frame_mask[ROW_MASK_SIZE_BYTES];
+        int any = 0;
+        for (int i = 0; i < ROW_MASK_SIZE_BYTES; i++) {
+            frame_mask[i] = s_row_mask[i];
+            any |= frame_mask[i];
+        }
+        if (!any) {
+            note_frame(gap_us, 0);
+            continue;
+        }
+
+        int slot = 0;
+        int y = 0;
+        while (y < SCREEN_HEIGHT) {
+            if (!row_is_dirty(frame_mask, y)) {
+                y++;
+                continue;
+            }
+
+            int y0 = y;
+            int rows = 0;
+            uint16_t *bounce = s_bands[slot];
+            while (y < SCREEN_HEIGHT && rows < BAND_ROWS && row_is_dirty(frame_mask, y)) {
+                for (int x = 0; x < SCREEN_WIDTH; x++) {
+                    int fb_index = y * SCREEN_WIDTH + x;
+                    bounce[rows * SCREEN_WIDTH + x] = s_pallete[s_indexed_framebuffer[fb_index]];
+                }
+                y++;
+                rows++;
+            }
+
+            /* Expand above overlapped the previous band. Draw only after it finishes. */
+            platform_wait_dma();
+            ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(
+                s_panel, 0, y0, SCREEN_WIDTH, y0 + rows, bounce));
+            platform_dma_queued();
+            slot ^= 1;
+        }
+
+        for (int i = 0; i < ROW_MASK_SIZE_BYTES; i++) {
+            s_row_mask[i] &= (uint8_t)~frame_mask[i];
+        }
+        platform_wait_dma();
+        note_frame(gap_us, platform_now_us() - ship_t0);
+    }
+}
+
 void app_main(void)
 {
     gpio_config_t bat = {
@@ -174,54 +235,8 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
     platform_spi_arm(io);
 
-    for (;;) {
-        int64_t gap_us = platform_pace(GLASS_PERIOD_US);
-        int64_t ship_t0 = platform_now_us();
-
-        /* Read once. Bits set during this ship belong to the next frame. */
-        uint8_t frame_mask[ROW_MASK_SIZE_BYTES];
-        int any = 0;
-        for (int i = 0; i < ROW_MASK_SIZE_BYTES; i++) {
-            frame_mask[i] = s_row_mask[i];
-            any |= frame_mask[i];
-        }
-        if (!any) {
-            note_frame(gap_us, 0);
-            continue;
-        }
-
-        int slot = 0;
-        int y = 0;
-        while (y < SCREEN_HEIGHT) {
-            if (!row_is_dirty(frame_mask, y)) {
-                y++;
-                continue;
-            }
-
-            int y0 = y;
-            int rows = 0;
-            uint16_t *bounce = s_bands[slot];
-            while (y < SCREEN_HEIGHT && rows < BAND_ROWS && row_is_dirty(frame_mask, y)) {
-                for (int x = 0; x < SCREEN_WIDTH; x++) {
-                    int fb_index = y * SCREEN_WIDTH + x;
-                    bounce[rows * SCREEN_WIDTH + x] = s_pallete[s_indexed_framebuffer[fb_index]];
-                }
-                y++;
-                rows++;
-            }
-
-            /* Expand above overlapped the previous band. Draw only after it finishes. */
-            platform_wait_dma();
-            ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(
-                panel, 0, y0, SCREEN_WIDTH, y0 + rows, bounce));
-            platform_dma_queued();
-            slot ^= 1;
-        }
-
-        for (int i = 0; i < ROW_MASK_SIZE_BYTES; i++) {
-            s_row_mask[i] &= (uint8_t)~frame_mask[i];
-        }
-        platform_wait_dma();
-        note_frame(gap_us, platform_now_us() - ship_t0);
+    s_panel = panel;
+    if (xTaskCreatePinnedToCore(present_task, "present", 4096, NULL, 5, NULL, 1) != pdPASS) {
+        ESP_ERROR_CHECK(ESP_ERR_NO_MEM);
     }
 }

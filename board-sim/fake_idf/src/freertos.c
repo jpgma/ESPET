@@ -49,6 +49,15 @@ BaseType_t xTaskCreate(TaskFunction_t task, const char *name,
     return pdPASS;
 }
 
+BaseType_t xTaskCreatePinnedToCore(TaskFunction_t task, const char *name,
+                                   const uint32_t stack, void *arg,
+                                   UBaseType_t priority, TaskHandle_t *out,
+                                   const BaseType_t core)
+{
+    (void)core;
+    return xTaskCreate(task, name, stack, arg, priority, out);
+}
+
 void vTaskDelay(TickType_t ticks)
 {
     DWORD ms = (DWORD)ticks * (DWORD)portTICK_PERIOD_MS;
