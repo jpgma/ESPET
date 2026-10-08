@@ -46,7 +46,7 @@ set BOARD_SIM_SPI_HZ=40000000
 sim.bat
 ```
 
-The stub paints a steady indexed field. PLUS and BOOT step the palette on the board. **Click** (little or no move) taps the fake CST816. This firmware does not read that tap yet. **Drag** past a few pixels tilts the fake IMU.
+The stub paints a steady indexed field. Keys **1**, **2**, and **3** are the Waveshare PWR, PLUS, and BOOT buttons. PLUS and BOOT step the palette. **Click** (little or no move) taps the fake CST816. This firmware does not read that tap yet. **Drag** past a few pixels tilts the fake IMU.
 
 Raster tasks: [docs/raster](docs/raster/README.md).
 

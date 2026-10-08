@@ -6,8 +6,8 @@
  * Do not invent GPIOs. GPIO18 is TF D1, not a spare.
  */
 
-#define LCD_H_RES 240
-#define LCD_V_RES 240
+#define SCREEN_WIDTH 240
+#define SCREEN_HEIGHT 240
 
 #define PIN_BAT_EN 2
 #define PIN_VBAT_ADC 1

@@ -11,6 +11,49 @@ void app_main(void);
 
 static uint16_t s_present[BOARD_SIM_LCD_W * BOARD_SIM_LCD_H];
 
+/* Two 20 ms backlight scans, plus a frame, so a tap still lands. */
+#define BUTTON_HOLD_MS 80
+
+static int s_button_held[3];
+static Uint32 s_button_until[3];
+
+static int button_from_scancode(SDL_Scancode code)
+{
+    switch (code) {
+    case SDL_SCANCODE_1:
+    case SDL_SCANCODE_KP_1:
+        return 0;
+    case SDL_SCANCODE_2:
+    case SDL_SCANCODE_KP_2:
+        return 1;
+    case SDL_SCANCODE_3:
+    case SDL_SCANCODE_KP_3:
+        return 2;
+    default:
+        return -1;
+    }
+}
+
+static void buttons_apply(Uint32 now)
+{
+    for (int i = 0; i < 3; i++) {
+        int down = s_button_held[i] || (s_button_until[i] != 0 && now < s_button_until[i]);
+        board_sim_button(i, down);
+        if (!down) {
+            s_button_until[i] = 0;
+        }
+    }
+}
+
+static void buttons_release_all(void)
+{
+    for (int i = 0; i < 3; i++) {
+        s_button_held[i] = 0;
+        s_button_until[i] = 0;
+        board_sim_button(i, 0);
+    }
+}
+
 static void format_spi(char *dst, size_t n, int hz)
 {
     if (hz <= 0) {
@@ -135,7 +178,7 @@ int main(int argc, char **argv)
     Uint32 last_tap_ms = 0;
     int running = 1;
 
-    printf("keys: click taps the fake CST816. Drag past a few pixels tilts the fake IMU.\n");
+    printf("keys: 1 PWR, 2 PLUS, 3 BOOT. Click taps the fake CST816. Drag past a few pixels tilts the fake IMU.\n");
     fflush(stdout);
 
     while (running) {
@@ -190,8 +233,22 @@ int main(int argc, char **argv)
                 if (imu_drag) {
                     board_sim_imu_on_drag(dx, dy, dt);
                 }
+            } else if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) && !e.key.repeat) {
+                int which = button_from_scancode(e.key.keysym.scancode);
+                if (which >= 0) {
+                    if (e.type == SDL_KEYDOWN) {
+                        s_button_held[which] = 1;
+                        s_button_until[which] = SDL_GetTicks() + BUTTON_HOLD_MS;
+                    } else {
+                        s_button_held[which] = 0;
+                    }
+                }
+            } else if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                buttons_release_all();
             }
         }
+
+        buttons_apply(SDL_GetTicks());
 
         const Uint32 now = SDL_GetTicks();
         if (now - last_title_ms >= 1000) {

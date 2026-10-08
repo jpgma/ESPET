@@ -1,5 +1,8 @@
 #include "driver/gpio.h"
 
+#include "board_pins.h"
+#include "board_sim.h"
+
 #include <string.h>
 #include <windows.h>
 
@@ -18,9 +21,12 @@ static void lock_init(void)
     if (!s_lock_ready) {
         InitializeCriticalSection(&s_lock);
         memset(s_level, 0, sizeof(s_level));
-        /* Idle-high inputs that the glass uses as open-drain INT / RST. */
+        /* Idle-high inputs: open-drain INT / RST, and the active-low keys. */
         s_level[47] = 1;
         s_level[48] = 1;
+        s_level[PIN_PWR] = 1;
+        s_level[PIN_PLUS] = 1;
+        s_level[PIN_BOOT] = 1;
         s_lock_ready = 1;
     }
 }
@@ -106,6 +112,15 @@ int gpio_isr_handler_remove(gpio_num_t gpio)
     s_isr_arg[gpio] = NULL;
     LeaveCriticalSection(&s_lock);
     return 0;
+}
+
+void board_sim_button(int which, int down)
+{
+    static const gpio_num_t pins[3] = {PIN_PWR, PIN_PLUS, PIN_BOOT};
+    if (which < 0 || which >= 3) {
+        return;
+    }
+    gpio_set_level(pins[which], down ? 0 : 1);
 }
 
 void board_sim_gpio_irq_falling(gpio_num_t gpio)
