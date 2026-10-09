@@ -13,24 +13,3 @@ CMakeCache.txt
 *.suo
 *.VC.db
 *.VC.opendb
-
-# local 7z password recovery, not part of the project
-/refs/look/OldSpice.7z
-/refs/look/oldspice.7z.hash
-/refs/look/FOUND_PASSWORD.txt
-/refs/look/crack7z.py
-/refs/look/crack_checkpoint.json
-/refs/look/crack_checkpoint.json.tmp
-/refs/look/crack_run*.log
-/refs/look/john_bases.txt
-/refs/look/john-dist/
-/refs/look/keep_extract.py
-/refs/look/keep_names.txt
-/refs/look/keep_numbers.txt
-/refs/look/keep_words.txt
-/refs/look/spotify_extract.py
-/refs/look/spotify_words.txt
-/refs/look/spotify_phrases.txt
-/refs/look/spotify_playlists/
-/refs/look/takeout-*/
-/refs/look/__pycache__/
