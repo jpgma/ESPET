@@ -141,9 +141,11 @@ static void present_task(void *arg)
             continue;
         }
 
+        // loop que joga framebuffer na tela
         int slot = 0;
         int y = 0;
         while (y < SCREEN_HEIGHT) {
+            // pula linha que n mudou
             if (!row_is_dirty(frame_mask, y)) {
                 y++;
                 continue;
@@ -152,8 +154,10 @@ static void present_task(void *arg)
             int y0 = y;
             int rows = 0;
             uint16_t *bounce = s_bands[slot];
+            // pega até BAND_ROWS linhas que precisam ser desenhadas e expande no buffer que vai para a tela
             while (y < SCREEN_HEIGHT && rows < BAND_ROWS && row_is_dirty(frame_mask, y)) {
                 for (int x = 0; x < SCREEN_WIDTH; x++) {
+                    // pega cor real a partir do index na palette e joga no buffer que vai para a tela
                     int fb_index = y * SCREEN_WIDTH + x;
                     bounce[rows * SCREEN_WIDTH + x] = s_pallete[s_indexed_framebuffer[fb_index]];
                 }
@@ -161,16 +165,19 @@ static void present_task(void *arg)
                 rows++;
             }
 
-            /* Expand above overlapped the previous band. Draw only after it finishes. */
             platform_wait_dma();
+            // joga linhas desenhadas na tela
             ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(
                 s_panel, 0, y0, SCREEN_WIDTH, y0 + rows, bounce));
             platform_dma_queued();
             slot ^= 1;
         }
 
+        // limpa masks para que apenas linhas que mudarem no proximo frame sejam mandadas para a tela
         for (int i = 0; i < ROW_MASK_SIZE_BYTES; i++) {
-            s_row_mask[i] &= (uint8_t)~frame_mask[i];
+            // limpa mask apenas de rows desenhadas nesse ship, 
+            // o que nao deve acontecer se apenas essa task desenhar no fb
+            s_row_mask[i] &= (uint8_t)~frame_mask[i]; 
         }
         platform_wait_dma();
         note_frame(gap_us, platform_now_us() - ship_t0);
