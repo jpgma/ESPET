@@ -699,6 +699,8 @@ A still pose skips SPI because the pose matches, not because of the battery. Mea
 
 USB in = **studio mode** (bright, glass ceiling, cortex allowed, USB debug). Unplug does not change the raster. Always hold `BAT_EN`. PWR long-press = latch off. Deep sleep ⇒ **no** USB Serial/JTAG.
 
+The desk card is a host visit while that cable is in. It is not a room. [docs/studio.md](docs/studio.md).
+
 **v1 wake map** (confirm edges on silicon):
 
 - **Light-sleep** (DMA idle, PA down): timer + CST816 INT **48** + PLUS **4**. IMU INT **6** only if shake should abort sleep. USB debug is off in this state.
@@ -792,6 +794,7 @@ Pins, schematic, and silicon how-to: **[jpgma/esp32-s3](https://github.com/jpgma
 4. **Impact decay and chirp takes.** Machinery is locked; the sounds are data. The MX1.25 coil already answered a 440 Hz sine.
 5. **Face-down last frame** — Nest sleep pose vs freeze the current room? TBD with the brain.
 6. **How hard a `full_frame` shake may be** — triangle cap and overdraw are locked. The ceiling is the glass (12500 µs). A slower frame runs at its work time. There is no second clock.
+7. **Desk visit** — host-only, while USB is in. Not a fifth room, not a door, not the cortex. [docs/studio.md](docs/studio.md).
 
 **Already locked, restated:** the room is triangles every frame. The pet is one skinned mesh. World down is gravity. No Kitchen. No follow-cam in L. No 4-yaw atlas. No backdrop. No z-buffer. Bowl does not flip. This firmware starts Wi-Fi so the heap is the cortex case. The pet is complete with the radio off. One I2C owner. ES7210 never probed. GPIO18 is not a spare.
 

@@ -1,10 +1,12 @@
 /build-sim/
 /firmware/build/
+/studio/bin/
+/studio/obj/
 /firmware/sdkconfig
 /firmware/sdkconfig.old
 /firmware/managed_components/
 /firmware/dependencies.lock
-/.vs/
+.vs/
 /out/
 CMakeUserPresets.json
 CMakeCache.txt

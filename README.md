@@ -4,12 +4,13 @@ Gravity-locked habitat of cube rooms on a [Waveshare ESP32-S3-Touch-LCD-1.54](ht
 
 Hardware bible (pins, schematic, datasheets, hello + `board-sim`): **[jpgma/esp32-s3](https://github.com/jpgma/esp32-s3)** → [`boards/waveshare-touch-lcd-154`](https://github.com/jpgma/esp32-s3/tree/main/boards/waveshare-touch-lcd-154). This repo keeps its own sim for habitat work; pin law lives there.
 
-## Two pieces (do not mix them)
+## Three pieces (do not mix them)
 
 | Folder | What it is |
 | :--- | :--- |
 | [`firmware/`](firmware/) | The program that will run on the ESP32. The raster stub paints an indexed frame. Habitat meshes raster here. **No SDL, no mouse, no cube renderer in the simulator.** |
 | [`board-sim/`](board-sim/) | A fake Waveshare: 240×240 ST7789 window, mouse-drag → QMI8658, **click → CST816** at 0x15. Your firmware does not know this exists. |
+| [`studio/`](studio/) | Desk card on the PC while the board is on USB. A host visit, not a room. Firmware does not know this exists. |
 
 The rooms, springs, meshes, and pet are firmware work you add later. The simulator never draws a habitat and never rasterizes a cube.
 
@@ -60,6 +61,16 @@ flash.bat --watch
 
 That builds `firmware/` with ESP-IDF, flashes the Espressif USB port, and opens an **ESPET** window with the serial log. `ESP_LOGI` lines show up there. Close that window to stop, or Ctrl+C in it. `flash.bat` without `--watch` flashes and returns. `--port COMx` overrides the port. ESP-IDF is `%USERPROFILE%\esp\esp-idf`, or `IDF_PATH` if that is already set. Do not put `board-sim/fake_idf` on that include path. Pins and `BAT_EN` are in the [hardware contract](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/HARDWARE.md).
 
+## Desk
+
+From the repo root:
+
+```text
+studio.bat
+```
+
+That opens the corner card and the tray icon. The card holds the Espressif COM port and shows the serial log (heap, ship, gap mean). Release the port from the tray before `flash.bat`. Do not run it beside `flash.bat --watch`. Details: [docs/studio.md](docs/studio.md).
+
 ## Mental model
 
-`board-sim` is a pretend PCB (glass + IMU). `firmware` is the chip program.
+`board-sim` is a pretend PCB (glass + IMU). `firmware` is the chip program. `studio` is the desk while the cable is in.

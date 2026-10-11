@@ -1,0 +1,48 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Espet.Studio"
+        x:Class="Espet.Studio.DeskWindow"
+        x:DataType="local:DeskModel"
+        Title="ESPET"
+        Width="300"
+        Height="340"
+        CanResize="False"
+        SystemDecorations="None"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        Background="#141414">
+  <Border Margin="10"
+          Padding="12"
+          BorderBrush="#333333"
+          BorderThickness="1"
+          CornerRadius="6">
+    <StackPanel Spacing="8">
+      <TextBlock Text="ESPET"
+                 FontSize="12"
+                 Foreground="#888888"/>
+      <TextBlock Text="{Binding Status}"
+                 FontSize="14"
+                 Foreground="#f2f2f2"
+                 TextWrapping="Wrap"/>
+      <StackPanel Spacing="2">
+        <TextBlock Text="heap internal" FontSize="11" Foreground="#888888"/>
+        <TextBlock Text="{Binding Heap}" FontSize="13" Foreground="#f2f2f2"/>
+      </StackPanel>
+      <StackPanel Spacing="2">
+        <TextBlock Text="ship" FontSize="11" Foreground="#888888"/>
+        <TextBlock Text="{Binding Ship}" FontSize="13" Foreground="#f2f2f2"/>
+      </StackPanel>
+      <StackPanel Spacing="2">
+        <TextBlock Text="gap mean" FontSize="11" Foreground="#888888"/>
+        <TextBlock Text="{Binding GapMean}" FontSize="13" Foreground="#f2f2f2"/>
+      </StackPanel>
+      <TextBlock Text="{Binding Log}"
+                 FontFamily="Cascadia Mono,Consolas,monospace"
+                 FontSize="11"
+                 Foreground="#9a9a9a"
+                 TextWrapping="Wrap"
+                 MaxHeight="96"/>
+    </StackPanel>
+  </Border>
+</Window>
