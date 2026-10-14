@@ -31,7 +31,7 @@ static bool spi_done(esp_lcd_panel_io_handle_t panel_io,
     return wake == pdTRUE;
 }
 
-static void init_wifi(void)
+void init_radio(void)
 {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -48,26 +48,24 @@ static void init_wifi(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-void platform_prepare(const void *indexed, size_t indexed_bytes,
-                      const void *palette, size_t palette_bytes,
-                      const void *bands, size_t bands_bytes)
-{
-    (void)indexed_bytes;
-    (void)palette_bytes;
-    (void)bands_bytes;
+// void display_memory(const void *indexed, size_t indexed_bytes,
+//                     const void *palette, size_t palette_bytes,
+//                     const void *bands, size_t bands_bytes)
+// {
+//     (void)indexed_bytes;
+//     (void)palette_bytes;
+//     (void)bands_bytes;
 
-    init_wifi();
-
-    /* sdkconfig: octal PSRAM 80 MHz, quad flash 80 MHz,
-     * Bluetooth off, Wi-Fi task pinned to core 0
-     * (CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0). */
-    ESP_LOGI(TAG, "free internal %u",
-             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-    ESP_LOGI(TAG, "indexed %s palette %s bands %s",
-             esp_ptr_internal(indexed) ? "internal" : "external",
-             esp_ptr_internal(palette) ? "internal" : "external",
-             esp_ptr_internal(bands) ? "internal" : "external");
-}
+//     /* sdkconfig: octal PSRAM 80 MHz, quad flash 80 MHz,
+//      * Bluetooth off, Wi-Fi task pinned to core 0
+//      * (CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0). */
+//     ESP_LOGI(TAG, "free internal %u",
+//              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+//     ESP_LOGI(TAG, "indexed %s palette %s bands %s",
+//              esp_ptr_internal(indexed) ? "internal" : "external",
+//              esp_ptr_internal(palette) ? "internal" : "external",
+//              esp_ptr_internal(bands) ? "internal" : "external");
+// }
 
 void platform_spi_arm(esp_lcd_panel_io_handle_t io)
 {

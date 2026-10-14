@@ -26,17 +26,8 @@ static int64_t host_time_us(void)
     return (ticks / freq) * 1000000LL + ((ticks % freq) * 1000000LL) / freq;
 }
 
-void platform_prepare(const void *indexed, size_t indexed_bytes,
-                      const void *palette, size_t palette_bytes,
-                      const void *bands, size_t bands_bytes)
+void init_radio(void)
 {
-    (void)indexed;
-    (void)palette;
-    (void)bands;
-    printf("indexed %u palette %u bands %u\n",
-           (unsigned)indexed_bytes,
-           (unsigned)palette_bytes,
-           (unsigned)bands_bytes);
 }
 
 void platform_spi_arm(esp_lcd_panel_io_handle_t io)

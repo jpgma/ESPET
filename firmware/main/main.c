@@ -73,7 +73,7 @@ static void on_key(board_key_t key)
 
 /* Ten frame starts, then one log. The sample after a log is dropped so
  * console time is not part of the next gap. */
-#define GAP_N 10
+#define GAP_N 80
 
 static int s_gap_n;
 static int s_gap_skip;
@@ -119,7 +119,64 @@ static void note_frame(int64_t gap_us, int64_t ship_us)
     }
 }
 
-static void present_task(void *arg)
+static void init_battery(void)
+{
+    gpio_config_t bat = {
+        .pin_bit_mask = 1ull << PIN_BAT_EN,
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    ESP_ERROR_CHECK(gpio_config(&bat));
+    gpio_set_level(PIN_BAT_EN, 1);
+}
+
+static void init_display(void)
+{
+    board_backlight_on_press(on_key);
+    board_backlight_init();
+
+    spi_bus_config_t buscfg = {
+        .mosi_io_num = PIN_LCD_MOSI,
+        .miso_io_num = -1,
+        .sclk_io_num = PIN_LCD_CLK,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .data4_io_num = -1,
+        .data5_io_num = -1,
+        .data6_io_num = -1,
+        .data7_io_num = -1,
+        .max_transfer_sz = SCREEN_WIDTH * SCREEN_HEIGHT * (int)sizeof(uint16_t),
+    };
+    ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
+
+    esp_lcd_panel_io_handle_t io = NULL;
+    esp_lcd_panel_io_spi_config_t io_cfg = {
+        .cs_gpio_num = PIN_LCD_CS,
+        .dc_gpio_num = PIN_LCD_DC,
+        .spi_mode = 3,
+        .pclk_hz = 80 * 1000 * 1000,
+        .trans_queue_depth = 1,
+        .lcd_cmd_bits = 8,
+        .lcd_param_bits = 8,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_cfg, &io));
+
+    esp_lcd_panel_handle_t panel = NULL;
+    esp_lcd_panel_dev_config_t panel_cfg = {
+        .reset_gpio_num = PIN_LCD_RST,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+        .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
+        .bits_per_pixel = 16,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io, &panel_cfg, &panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true));
+    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+    platform_spi_arm(io);
+    s_panel = panel;
+}
+
+static void render_task(void *arg)
 {
     (void)arg;
 
@@ -186,64 +243,9 @@ static void present_task(void *arg)
 
 void app_main(void)
 {
-    gpio_config_t bat = {
-        .pin_bit_mask = 1ull << PIN_BAT_EN,
-        .mode = GPIO_MODE_OUTPUT,
-    };
-    ESP_ERROR_CHECK(gpio_config(&bat));
-    gpio_set_level(PIN_BAT_EN, 1);
+    init_battery();
+    init_radio();
+    init_display();
 
-    ESP_LOGI(TAG, "ESPET starting up");
-    
-    board_backlight_on_press(on_key);
-    board_backlight_init();
-
-    platform_prepare(s_indexed_framebuffer, sizeof(s_indexed_framebuffer),
-                     s_pallete, sizeof(s_pallete),
-                     s_bands, sizeof(s_bands));
-
-    spi_bus_config_t buscfg = {
-        .mosi_io_num = PIN_LCD_MOSI,
-        .miso_io_num = -1,
-        .sclk_io_num = PIN_LCD_CLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .data4_io_num = -1,
-        .data5_io_num = -1,
-        .data6_io_num = -1,
-        .data7_io_num = -1,
-        .max_transfer_sz = SCREEN_WIDTH * SCREEN_HEIGHT * (int)sizeof(uint16_t),
-    };
-    ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
-
-    esp_lcd_panel_io_handle_t io = NULL;
-    esp_lcd_panel_io_spi_config_t io_cfg = {
-        .cs_gpio_num = PIN_LCD_CS,
-        .dc_gpio_num = PIN_LCD_DC,
-        .spi_mode = 3,
-        .pclk_hz = 80 * 1000 * 1000,
-        .trans_queue_depth = 1,
-        .lcd_cmd_bits = 8,
-        .lcd_param_bits = 8,
-    };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_cfg, &io));
-
-    esp_lcd_panel_handle_t panel = NULL;
-    esp_lcd_panel_dev_config_t panel_cfg = {
-        .reset_gpio_num = PIN_LCD_RST,
-        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-        .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
-        .bits_per_pixel = 16,
-    };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io, &panel_cfg, &panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
-    platform_spi_arm(io);
-
-    s_panel = panel;
-    if (xTaskCreatePinnedToCore(present_task, "present", 4096, NULL, 5, NULL, 1) != pdPASS) {
-        ESP_ERROR_CHECK(ESP_ERR_NO_MEM);
-    }
+    xTaskCreatePinnedToCore(render_task, "render", 4096, NULL, 5, NULL, 1);
 }

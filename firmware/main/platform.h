@@ -12,11 +12,15 @@
 #include "esp_lcd_panel_io.h"
 #include "platform_target.h"
 
-/* On the chip this brings Wi-Fi up first, then logs where the buffers sit.
- * On the sim it prints the buffer sizes. */
-void platform_prepare(const void *indexed, size_t indexed_bytes,
-                      const void *palette, size_t palette_bytes,
-                      const void *bands, size_t bands_bytes);
+/* Bring Wi-Fi up so the internal heap is the cortex case. No-op on the sim. */
+void init_radio(void);
+
+/* On the chip, log where the buffers sit and the free internal heap.
+ * On the sim, print the buffer sizes. 
+ void display_memory(const void *indexed, size_t indexed_bytes,
+ const void *palette, size_t palette_bytes,
+ const void *bands, size_t bands_bytes);
+ */
 
 /* Arm the wait for a band that is on the wire.
  * The sim's draw_bitmap already holds the previous transfer. */
