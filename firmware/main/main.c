@@ -47,6 +47,7 @@ DMA_ATTR static uint16_t s_bands[2][BAND_ROWS * SCREEN_WIDTH];
 DMA_ATTR static uint8_t s_row_mask[ROW_MASK_SIZE_BYTES];
 
 static volatile int s_bg;
+static volatile int s_bg_changed;
 static esp_lcd_panel_handle_t s_panel;
 
 /* Bit 0 is the first row in that byte. */
@@ -62,12 +63,7 @@ static void on_key(board_key_t key)
     } else {
         s_bg = (s_bg + PALETTE_SIZE - 1) % PALETTE_SIZE;
     }
-    for(int i = 0; i < FRAME_BUFFER_SIZE_BYTES; i++){
-        s_indexed_framebuffer[i] = s_bg;
-    }
-    for(int i = 0; i < ROW_MASK_SIZE_BYTES; i += (s_bg%2) + 1){
-        s_row_mask[i] = 0xFF;
-    }
+    s_bg_changed = 1;
     ESP_LOGI(TAG, "background %d", s_bg);
 }
 
@@ -185,6 +181,15 @@ static void render_task(void *arg)
         int64_t ship_t0 = platform_now_us();
 
         // render goes here ig
+        if(s_bg_changed){
+            for(int i = 0; i < FRAME_BUFFER_SIZE_BYTES; i++){
+                s_indexed_framebuffer[i] = s_bg;
+            }
+            for(int i = 0; i < ROW_MASK_SIZE_BYTES; i += (s_bg%2) + 1){
+                s_row_mask[i] = 0xFF;
+            }
+            s_bg_changed = 0;
+        }
 
         // ler mask de rows, se nada mudou, nada renderiza
         uint8_t frame_mask[ROW_MASK_SIZE_BYTES];

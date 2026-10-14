@@ -1,0 +1,40 @@
+# Simulator include path lives in compile_flags.txt (the Visual Studio
+# generator does not write compile_commands.json). This file only adjusts
+# clangd: headers are C, and generated trees are not diagnosed.
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+
+---
+If:
+  PathMatch: .*\.h
+CompileFlags:
+  Add:
+    - -xc-header
+
+---
+# CMake output and the fetched SDL sources.
+If:
+  PathMatch: .*build-sim.*
+Index:
+  Background: Skip
+CompileFlags:
+  Add:
+    - -ferror-limit=0
+Diagnostics:
+  Suppress: "*"
+
+---
+# Chip translation unit. These flags are the simulator, not ESP-IDF.
+# Do not point the firmware build at board-sim/fake_idf.
+If:
+  PathMatch: .*esp32.*
+Index:
+  Background: Skip
+CompileFlags:
+  Add:
+    # Missing ESP-IDF headers would otherwise stop the parse with
+    # "too many errors", which Suppress does not hide.
+    - -ferror-limit=0
+Diagnostics:
+  Suppress: "*"

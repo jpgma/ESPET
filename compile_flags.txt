@@ -1,0 +1,9 @@
+-std=c11
+-Iboard-sim/fake_idf/include
+-Ifirmware
+-Ifirmware/main
+-Ifirmware/main/win32
+-Ifirmware/board_backlight/include
+-Iboard-sim/include
+-Ibuild-sim/_deps/sdl2-build/include/SDL2
+-Ibuild-sim/_deps/sdl2-build/include-config-release/SDL2
