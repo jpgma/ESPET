@@ -2,49 +2,49 @@
 
 ← [pose mailbox](./05-pose-mailbox.md) · [index](./README.md) · [next: painter order](./07-painter.md) →
 
-**Goal:** a small scene becomes screen triangles in internal scratch, and a frame that did not move produces an empty row mask and no SPI.
+**Objective:** change a small scene into screen triangles in the internal scratch. If nothing moves in a frame, the row mask must be empty and there must be no SPI.
 
-**Depends on:** tasks 4 and 5.
+**Prerequisites:** tasks 4 and 5.
 
-**Read:** [guide 03](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/03-display-st7789.md) GRAM-hold · [guide 05](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/05-6axis-filter.md) only for the yaw limit, if you hook a camera at all
+**Read:** [guide 03](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/03-display-st7789.md) (GRAM hold) · [guide 05](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/05-6axis-filter.md), only for the yaw limit, and only if you connect a camera
 
 ## Scene
 
-Hard-code one creature-sized mesh and a few props in a C table in `firmware/main/`. Stay under the **1024** triangle cap. This is not an asset pipeline.
+Write one mesh of creature size and a small number of props in a C table in `firmware/main/`. Stay below the limit of **1024** triangles. This is not an asset pipeline.
 
-Store the tables in ordinary const data. On the chip that may land in flash, which is fine: copy the triangles you will draw into the internal scratch from task 1 at the start of the frame. The filler from task 4 reads the scratch, not PSRAM and not the const mesh, while it is writing pixels.
+Keep the tables in usual const data. On the chip, this data can be in flash. This is permitted: at the start of the frame, copy the triangles that you will draw into the internal scratch from task 1. While the filler from task 4 writes pixels, it reads the scratch. It does not read PSRAM or the const mesh.
 
 ## Transform and clip
 
-Float or Q16 at the vertices is fine. The filler stays integer.
+You can use float or Q16 at the vertices. The filler stays integer.
 
-Per frame, from the interpolated pose:
+For each frame, from the interpolated pose:
 
-1. Transform and project. Perspective divide once per vertex.
-2. Clip to the 240×240 screen before raster. Drop triangles that miss the screen. Clip the ones that cross an edge; a six-vertex result split into triangles is enough.
-3. Write screen-space triangles into the scratch, with a color index (flat, or a vertex index you resolve to one index for now) and a sort key for task 7 (a 16-bit depth of the triangle).
-4. Build the row mask from each triangle’s Y range.
+1. Transform and project. Do the perspective divide one time for each vertex.
+2. Clip to the 240×240 screen before the raster. Remove the triangles that are not on the screen. Clip the triangles that cross an edge. A six-vertex result, divided into triangles, is sufficient.
+3. Write the screen-space triangles into the scratch, with a color index and a sort key for task 7 (a 16-bit depth of the triangle). For now, the color index is flat, or it is a vertex index that you change to one index.
+4. Make the row mask from the Y range of each triangle.
 
-Sub-pixel motion, and a pose that matches the last presented pose, leaves the mask empty. Task 3 then skips SPI.
+If the movement is less than one pixel, or if the pose is the same as the last presented pose, the mask stays empty. Then task 3 does not use SPI.
 
-A flag on the pose, `full_frame`, sets all 240 rows. Ordinary frames leave it clear. Task 8 is what sets it. You can also set it when the camera moves by more than a pixel, which is the same idea.
+A flag on the pose, `full_frame`, sets all 240 rows. Usual frames keep it clear. Task 8 sets it. You can also set it when the camera moves by more than one pixel. This is the same concept.
 
 ## Camera
 
-Default camera is fixed. If you attach the board’s tilt, use pitch and roll only. Yaw around gravity drifts; do not treat it as a compass. A moving camera is a full-frame event.
+The default camera is fixed. If you connect the tilt of the board, use only pitch and roll. Yaw around gravity drifts. Do not use it as a compass. A moving camera is a full-frame event.
 
 ## Tests
 
-- One known view: a handful of projected vertices checked against hand calculation (a cube corner is enough).
-- A triangle that crosses `x = 0` is clipped; the filler never sees a negative X.
-- Two identical poses in a row: the second present does not call `draw_bitmap`.
-- Move one instance by several pixels: only the old and new Y spans are set in the mask.
-- `full_frame` set: all 240 bits set, even if the meshes are small.
+- One known view: compare a small number of projected vertices with a manual calculation (a cube corner is sufficient).
+- A triangle that crosses `x = 0` is clipped. The filler never gets a negative X.
+- Two poses that are the same, one after the other: the second present does not call `draw_bitmap`.
+- Move one instance by several pixels: only the old and the new Y spans are set in the mask.
+- With `full_frame` set: all 240 bits are set, also when the meshes are small.
 
-## Done when
+## Complete when
 
-Those five tests pass on the host, and `sim.bat` shows the still hold (the window does not flicker from a needless full clear) and the moved instance.
+The five tests pass on the host. `sim.bat` shows the still hold (the window does not flicker from an unnecessary full clear) and the moved instance.
 
-## Leave for later
+## For later
 
-Painter sort is task 7. The sort key is stored here and not used yet. No textures.
+The painter sort is task 7. This task stores the sort key, but does not use it yet. No textures.

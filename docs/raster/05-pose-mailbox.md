@@ -2,59 +2,59 @@
 
 ← [one triangle](./04-one-triangle.md) · [index](./README.md) · [next: mesh and dirty rows](./06-mesh-clip-dirty.md) →
 
-**Goal:** simulations publish a pose and return. Present stays at the maximum the frame allows, capped at the glass, and a stalled publisher holds the last pose.
+**Objective:** the simulations publish a pose and return. The present runs at the maximum rate that the frame permits, with the glass as the limit. If the publisher stops, the present holds the last pose.
 
-**Depends on:** task 3’s clock. The triangle can stay on screen as the thing that moves.
+**Prerequisites:** the clock from task 3. The triangle can stay on the screen as the moving item.
 
-**Read:** [docs/soc.md](https://github.com/jpgma/esp32-s3/blob/main/docs/soc.md) two cores and the `volatile` line · [guide 02](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/02-soc-memory-smp.md)
+**Read:** [docs/soc.md](https://github.com/jpgma/esp32-s3/blob/main/docs/soc.md) (two cores and the `volatile` line) · [guide 02](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/02-soc-memory-smp.md)
 
 ## Contract
 
-A pose is a POD in `firmware/main/`: timestamp in microseconds, a camera, and a short list of instance transforms (translation plus a quaternion is enough). No pointers into sim memory. No ESP-IDF types.
+A pose is a POD in `firmware/main/`. It has a timestamp in microseconds, a camera and a short list of instance transforms (a translation and a quaternion are sufficient). It has no pointers into sim memory. It has no ESP-IDF types.
 
-Three slots, sized in `budget.md`. The publisher:
+There are three slots. Their size is in `budget.md`. The publisher does these steps:
 
-1. Writes a free slot.
-2. Stores the slot index with an atomic release (or a seqlock). `volatile` is not the barrier.
+1. It writes a free slot.
+2. It stores the slot index with an atomic release (or a seqlock). `volatile` is not the barrier.
 
-The renderer, once per frame, on core 1:
+The renderer does these steps one time for each frame, on Core 1:
 
-1. Loads the latest published slot with an atomic acquire.
-2. Keeps the previous pose as well.
-3. Interpolates to the **frame start**, not to “whenever the sim last ran.” Normalize the quaternion (nlerp is enough). Lerp the translation. Clamp the blend to the newest pose.
-4. If the newest timestamp is older than the glass cap (**12500 µs**), draw that pose as-is. Do not extrapolate.
+1. It loads the latest published slot with an atomic acquire.
+2. It also keeps the previous pose.
+3. It interpolates to the **frame start**, not to the time of the last sim step. Normalize the quaternion (nlerp is sufficient). Lerp the translation. Clamp the blend to the newest pose.
+4. If the newest timestamp is older than the glass limit (**12500 µs**), it draws that pose without a change. Do not extrapolate.
 
-The publisher never waits for present. The renderer never waits for the publisher, for I2C, or for Wi-Fi.
+The publisher never waits for the present. The renderer never waits for the publisher, for I2C or for Wi-Fi.
 
-## Who runs where
+## Core allocation
 
 | Work | Core |
 | :--- | :--- |
-| Present and interpolate | 1, pinned, no other task |
-| Dummy publisher, and later the real sims | 0 |
+| Present and interpolation | 1, pinned, no other task |
+| Dummy publisher, and later the real simulations | 0 |
 | Wi-Fi task | 0 (task 2) |
-| I2C | 0, one owner. This dummy publisher does not touch GPIO 41/42. |
+| I2C | 0, one owner. This dummy publisher does not use GPIO 41/42. |
 
-The sim’s fake FreeRTOS is a `Sleep`. It is not SMP. Prove the mailbox with a host test: a writer thread and a reader thread, or a single-threaded script that publishes three poses and checks the reader never observes a torn transform (write a sentinel word first and last; they must match).
+The fake FreeRTOS of the simulator is a `Sleep`. It is not SMP. Prove the mailbox with a host test. Use a writer thread and a reader thread. Or, use a single-thread script that publishes three poses and makes sure that the reader never sees a torn transform. (Write a sentinel word first and last. The two words must be the same.)
 
 ## Hitch test
 
-Writer sleeps in irregular bursts (tens of milliseconds, sometimes longer than the glass cap). Reader logs present-start timestamps.
+The writer sleeps in bursts of different lengths (tens of milliseconds, sometimes longer than the glass limit). The reader records the timestamps of each present start.
 
-- Start-to-start stays on the task 3 cap while the frame is cheaper than 12500 µs. The publisher’s sleeps do not add to the gap. The Windows thread clock will wander; record it. On the chip, that gap stays within **2 ms** of 12500 µs while the writer is bursting.
-- When the frame’s own work is longer than the cap, the gap is that work time.
-- During a stall longer than the glass cap, the interpolated pose stops changing.
-- When the writer resumes, the picture eases between the last held pose and the new one. It does not jump to a partial write.
+- While the frame takes less than 12500 µs, the gap between starts stays on the limit of task 3. The sleeps of the publisher do not add to the gap. The Windows thread clock is not accurate. Record the error. On the chip, the gap stays within **2 ms** of 12500 µs while the writer sleeps in bursts.
+- When the work of the frame takes longer than the limit, the gap is that work time.
+- During a stop that is longer than the glass limit, the interpolated pose does not change.
+- When the writer starts again, the picture moves smoothly from the last held pose to the new pose. It does not jump to a partial write.
 
-Put the observed gaps in `budget.md` as a note under the glass-cap line.
+Write the gaps that you see in `budget.md`, as a note below the glass-limit line.
 
-## Done when
+## Complete when
 
-- A torn pose is rejected by the host test.
-- A stall holds the last complete pose.
-- Present starts stay on the glass cap while the publisher hitches and the frame is cheaper than that cap.
-- The raster core still has no ESP-IDF include. Atomics from `stdatomic.h` are fine.
+- The host test rejects a torn pose.
+- If the publisher stops, the present holds the last complete pose.
+- The present starts stay on the glass limit while the publisher stops for short periods, if the frame takes less time than that limit.
+- The raster core still has no ESP-IDF include. Atomics from `stdatomic.h` are permitted.
 
-## Leave for later
+## For later
 
-No real IMU camera, no mesh file format. Task 6 consumes this pose.
+No real IMU camera, no mesh file format. Task 6 uses this pose.

@@ -1,6 +1,6 @@
 # Budget
 
-Arithmetic for this rasterizer. Silicon measurements stay blank until that task logs them.
+This page gives the arithmetic for this rasterizer. The silicon measurement lines stay empty until the related task records them.
 
 ## Memory
 
@@ -18,13 +18,13 @@ Arithmetic for this rasterizer. Silicon measurements stay blank until that task 
 | Line | Arithmetic | Result |
 | :--- | :--- | ---: |
 | Full-frame SPI | 240 × 240 × 16 / 80000000 | 11520 µs |
-| Glass cap | 1000000 / 80 | 12500 µs |
+| Glass limit | 1000000 / 80 | 12500 µs |
 | Margin | 12500 − 11520 | 980 µs |
 | Core 1 cycles | 240000000 / 80 | 3000000 |
 
 ## Measured
 
-| Line | When | Result |
+| Line | Condition | Result |
 | :--- | :--- | :--- |
 | Free internal heap | Wi-Fi started, Bluetooth off | 184387 bytes |
 | SPI on the glass | Task 8 | |

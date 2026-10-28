@@ -1,32 +1,42 @@
 # Desk
 
-A host visit while the board is on USB. The corner card is where the pet can later sit, the way a desktop pet leaves its island for a corner of the screen. The glass keeps the current habitat room.
+The desk is a visit on the host. It is available only when the board is connected through USB. Later, the pet can sit on the corner card. This is similar to a desktop pet that goes from its island to a corner of the screen. The glass continues to show the current habitat room.
 
-This is not a firmware room, not a door, and not the cortex. The v1 map stays Nest, Play, Hall, and Yard. Firmware does not know the window exists, the same rule as `board-sim`.
+The desk is not a firmware room. It is not a door and it is not the cortex. The v1 map does not change: Nest, Play, Hall and Yard. The firmware does not know about the window. This is the same rule as for `board-sim`.
 
-Play still works with the app closed. Unplug ends the visit. The lizard brain does not move onto the PC.
+The pet continues to operate when the app is closed. When you disconnect the cable, the visit stops. The lizard brain does not move to the PC.
 
 ## This pass
 
-`studio.bat` opens a small always-on-top card at the bottom-right of the work area, and a tray icon. The card holds the Espressif USB serial port (`VID_303A`, one `(COMx)`). It reads the log the firmware already prints. It does not reboot the chip: DTR and RTS stay off, and there is no esptool reset.
+`studio.bat` opens a small card and a tray icon. The card is always on top, at the bottom-right of the work area. The card holds the Espressif USB serial port (`VID_303A`, one `(COMx)`). It reads the log that the firmware prints. It does not reset the chip: DTR and RTS stay off, and the card does not use an esptool reset.
 
 | Line | Shown as |
 | :--- | :--- |
-| `free internal` | heap internal, bytes. Printed once at boot, so it stays blank until that line arrives. |
-| `ship` | latest ship, microseconds |
-| `gap mean` | gap mean, microseconds |
+| `free internal` | Internal heap, in bytes. The firmware prints this line one time at boot. The field stays empty until the line arrives. |
+| `ship` | Latest ship time, in microseconds |
+| `gap mean` | Mean gap, in microseconds |
 
-The last few log lines sit under the numbers. Zero ports reads "no board". More than one port is reported and left closed. A busy port reads "in use".
+The last log lines show below the numbers. If there is no port, the card shows "no board". If there is more than one port, the card shows this condition and does not open a port. If the port is busy, the card shows "in use".
 
-The card owns the port. It cannot run beside `flash.bat --watch`. Release the port from the tray, then run `flash.bat`. Show on the tray menu takes the port back. Click the tray icon to hide the card, and click it again to show it. Close hides the card too. Quit is on the tray menu.
+The card owns the port. You cannot use the card and `flash.bat --watch` at the same time. To flash the board, do these steps:
+
+1. Release the port from the tray.
+2. Run `flash.bat`.
+3. To get the port again, select **Show** on the tray menu.
+
+Other controls:
+
+- To hide the card, click the tray icon. To show the card again, click the icon again.
+- **Close** also hides the card.
+- **Quit** is on the tray menu.
 
 ## Later
 
-Not this pass:
+These items are not in this pass:
 
 - Draw the pet in the corner.
-- Debug flags from the card (hitbox wireframe and the rest), drawn on the glass.
-- The UDP cortex guest inside this same .NET process.
-- Start the tray app at login, so the card appears when the cable is plugged in.
+- Set debug flags from the card (for example, the hitbox wireframe). The glass shows them.
+- Put the UDP cortex guest in this .NET process.
+- Start the tray app at login. Then the card shows when you connect the cable.
 
-A periodic stats line in the firmware is not part of this. Those prints sit inside the frame-gap measurement.
+A periodic statistics line in the firmware is not part of this work. Those prints are in the frame-gap measurement.

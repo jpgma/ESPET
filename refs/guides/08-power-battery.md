@@ -2,4 +2,4 @@
 
 Board nets (`BAT_EN`, ETA6098, no PMIC): [jpgma/esp32-s3 guide 08](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/08-power-battery.md).
 
-ESPET: 8 h is parked. An empty row mask is how a still pose ships nothing. The present ceiling is the glass, not a 33 ms tick. Wait for TX-done before sleep: [`architecture.md` §14](../../architecture.md#14-power-8-h-parked).
+ESPET: the 8 h target is parked. An empty row mask lets a still pose send nothing. The present limit is the glass, not a 33 ms tick. Wait for TX-done before sleep. Refer to [`architecture.md` §14](../../architecture.md#14-power-8-h-parked).

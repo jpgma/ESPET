@@ -2,40 +2,40 @@
 
 ← [painter order](./07-painter.md) · [index](./README.md)
 
-**Goal:** a scripted camera move, which dirties every row, presents at the rate the work allows, capped at the glass. There is no slower locked period to fall back to.
+**Objective:** a scripted camera move makes all rows dirty. It must present at the rate that the work permits, with the glass as the limit. There is no slower locked period to use as a fallback.
 
-**Depends on:** tasks 3, 5, 6, and 7.
+**Prerequisites:** tasks 3, 5, 6 and 7.
 
-**Read:** [guide 03](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/03-display-st7789.md) 80 MHz measurement · [bring-up](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/09-bring-up.md) step 2
+**Read:** [guide 03](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/03-display-st7789.md) (80 MHz measurement) · [bring-up](https://github.com/jpgma/esp32-s3/blob/main/boards/waveshare-touch-lcd-154/docs/guides/09-bring-up.md) step 2
 
 ## The interval
 
-For about two seconds, publish poses whose camera moves every sim tick and whose `full_frame` flag is set. The dummy publisher from task 5 keeps hitching on core 0 during the interval. Core 1 interpolates and presents.
+For approximately two seconds, publish poses that have the `full_frame` flag set and a camera that moves on each sim tick. During the interval, the dummy publisher from task 5 continues to stop for short periods on Core 0. Core 1 interpolates and presents.
 
-Every frame of the interval:
+On each frame of the interval:
 
 - All 240 row bits are set.
-- Work time is raster plus the wait for the last band’s DMA, measured with `esp_timer_get_time` or `CCOUNT` around that work, not around the idle wait for the glass cap.
-- The next frame starts when that work finishes. It does not wait out another 12500 µs on top.
+- The work time is the raster time plus the wait for the DMA of the last band. Measure it with `esp_timer_get_time` or `CCOUNT` around that work. Do not include the idle wait for the glass limit.
+- The next frame starts when that work is complete. It does not wait another 12500 µs.
 
-The steady scene, before and after the interval, still skips SPI when nothing moved.
+Before and after the interval, the steady scene still does not use SPI when nothing moves.
 
-## Pass bar
+## Pass criterion
 
-SPI is **80 MHz, mode 3**. Record every frame’s work time. The rate for the interval is the slower of the glass (**80 Hz**) and `1 / work_time`. The margin line in `budget.md` is the slack you thought you had inside 12500 µs; replace the guessed raster time with the measured one.
+SPI is **80 MHz, mode 3**. Record the work time of each frame. The rate for the interval is the slower of the glass (**80 Hz**) and `1 / work_time`. The margin line in `budget.md` is the slack that you expected in 12500 µs. Replace the estimated raster time with the measured value.
 
-A frame slower than 12500 µs is not a missed deadline. Write the measured work time and the resulting rate. Do not add a sleep to hold a lower rate, and do not keep a second cadence for still frames.
+A frame that is slower than 12500 µs is not a missed deadline. Write the measured work time and the rate that it gives. Do not add a sleep to keep a lower rate. Do not keep a second cadence for still frames.
 
-## Host half
+## Host part
 
-You can dry-run the flag on the sim. One SPI transfer stays in flight, so the next draw stalls only for whatever wire is still left. At 80 MHz a full frame is about 12 ms of wire. `BOARD_SIM_SPI_HZ` can override that clock. The title is a rough landing. A sim gap does **not** fail the task. The pass bar is the silicon measurement.
+You can test the flag on the simulator. One SPI transfer stays in the queue. Thus, the next draw waits only for the remaining wire time. At 80 MHz, a full frame is approximately 12 ms of wire time. `BOARD_SIM_SPI_HZ` can replace that clock. The title gives an approximate value. A gap in the simulator does **not** make the task fail. The pass criterion is the silicon measurement.
 
-## Done when
+## Complete when
 
-- The interval presents as fast as the work allows, with the hitching publisher running, and never faster than 80 Hz.
-- `budget.md` shows measured full-frame work time at 80 MHz, and the rate that work produced.
-- Still frames outside the interval still produce an empty mask.
+- The interval presents as fast as the work permits, with the publisher that stops for short periods, and never faster than 80 Hz.
+- `budget.md` shows the measured full-frame work time at 80 MHz, and the rate that this work gave.
+- Still frames outside the interval still give an empty mask.
 
-## After this
+## After this task
 
-Textures, 120×120 with 2× replicate at scanout, and a SIMD filler are in scope only if the measured rate is unacceptable. Each of those is a new plan that starts by editing `budget.md`, not by adding a shader.
+These items are in scope only if the measured rate is not acceptable: textures, 120×120 with 2× replication at scanout, and a SIMD filler. Each of these items is a new plan. That plan starts with a change to `budget.md`, not with a new shader.
