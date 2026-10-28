@@ -117,6 +117,7 @@ static void note_frame(int64_t gap_us, int64_t ship_us)
 
 static void init_battery(void)
 {
+    // inicializando bateria
     gpio_config_t bat = {
         .pin_bit_mask = 1ull << PIN_BAT_EN,
         .mode = GPIO_MODE_OUTPUT,
@@ -168,8 +169,14 @@ static void init_display(void)
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
-    platform_spi_arm(io);
     s_panel = panel;
+
+    platform_spi_arm(io);
+}
+
+static void simulate_task(void *arg)
+{
+
 }
 
 static void render_task(void *arg)
@@ -252,5 +259,6 @@ void app_main(void)
     init_radio();
     init_display();
 
+    // xTaskCreatePinnedToCore(simulate_task, "simulate", 4096, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(render_task, "render", 4096, NULL, 5, NULL, 1);
 }
